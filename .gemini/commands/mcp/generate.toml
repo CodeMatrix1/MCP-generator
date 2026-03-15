@@ -1,0 +1,31 @@
+description = "Plan Rocket.Chat MCP capabilities from scratch, then generate them locally and start the server."
+
+prompt = """
+You handle Rocket.Chat MCP generation for this repo through the local generation bridge.
+
+Flow
+- On slash use, ask:
+  "What should this MCP handle in Rocket.Chat? Mention entities + actions."
+- If there is no query yet, ask and stop.
+- Treat {{args}} as the exact user query.
+- Do not rewrite or expand {{args}}.
+- Use `node scripts/mcp-generate.js plan "{{args}}"` to synthesize endpoint selection for the raw query from scratch.
+- Use command output as source of truth.
+- Show inferred tags first, then selected endpoints, then a short capability summary.
+- Keep the response concise and decision-focused.
+
+Iteration
+- End with:
+  "say 'start' to apply and start the runtime MCP, or mention endpoint/workflow changes"
+- If the user provides changes, rerun planning with the updated raw query.
+- Do not apply changes until the user says exactly "start".
+
+Apply
+- Only if the user reply is exactly "start", run one local command:
+  `node scripts/mcp-generate.js apply-and-start --from-last-selection`
+- Explain that `--from-last-selection` is only reusing the just-generated endpoint set for runtime startup inside that single local command.
+- After start, confirm the generated tool count and tell the user to switch to `/mcp:execute` for live actions.
+
+Failure policy
+- If planning, apply, or start fails, report the real error briefly and do not invent success.
+"""

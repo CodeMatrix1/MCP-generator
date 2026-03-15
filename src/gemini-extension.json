@@ -1,0 +1,11 @@
+{
+  "name": "rocket-chat-mcp",
+  "version": "1.0.0",
+  "description": "Gemini CLI bridge for Rocket.Chat MCP Server",
+  "mcpServers": [
+    {
+      "name": "rocket-chat",
+      "url": "http://localhost:4001"
+    }
+  ]
+}

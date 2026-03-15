@@ -1,0 +1,41 @@
+{
+  "name": "rc_mcp_synthesizer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "mcp-synth": "./bin/mcp-synth.js"
+  },
+  "scripts": {
+    "ast:parse": "ts-node AST-Parser.ts",
+    "ast:prompt": "node LLM-1-Prompt-Gen.js",
+    "mcp:prompt": "node src/index.js",
+    "mcp:prompt:only": "node src/index.js --no-server",
+    "mcp:call": "node scripts/mcp-call.js",
+    "mcp:runtime:call": "node scripts/mcp-runtime-call.js",
+    "mcp:generate": "node scripts/mcp-generate.js",
+    "mcp:status": "node src/index.js --status",
+    "mcp:stop": "node src/index.js --stop-server",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test ./tests/runtime-tools.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "@dqbd/tiktoken": "^1.0.22",
+    "child-process": "^1.0.2",
+    "dotenv": "^17.3.1",
+    "express": "^4.19.2",
+    "kill-port": "^2.0.1",
+    "shutil": "^0.0.1",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

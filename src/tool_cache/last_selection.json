@@ -1,0 +1,25 @@
+{
+  "query": "make an MCP that allows me to manage channels, its messages and dms",
+  "selectedEndpoints": [
+    "post-api-v1-channels.create",
+    "post-api-v1-channels.delete",
+    "get-api-v1-channels.list",
+    "get-api-v1-channels.messages",
+    "post-api-v1-chat.postMessage",
+    "post-api-v1-chat.update",
+    "post-api-v1-chat.delete",
+    "post-api-v1-im.create",
+    "post-api-v1-im.delete",
+    "get-api-v1-im.list",
+    "get-api-v1-im.messages"
+  ],
+  "tokenUsage": {
+    "input": 30,
+    "output": 88
+  },
+  "generation": {
+    "generatedCount": 11,
+    "skippedCount": 0,
+    "manifestPath": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/manifest.json"
+  }
+}
