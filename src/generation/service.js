@@ -1,21 +1,48 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { classifyDomain } from "../selection/DomainSelect.js";
-import { finalEndpoints } from "../selection/FinalEndpoints.js";
-import numTokensFromString from "../LLM_calls/lib/tiktoken-script.js";
 import { generateMcpTools } from "../Tool_gen/RegisterTools.js";
+import { writeWorkflowModules } from "../workflows/store.js";
+import {
+  collectCandidateEndpointKeys,
+  resolveWorkflowCandidatesWithLlm,
+} from "../workflows/WorkflowResolve.js";
+import {
+  createWorkflowFromEndpoints,
+  fallbackWorkflowDecomposition,
+  fallbackWorkflowDecompositionFromEndpoints,
+} from "../workflows/WorkflowSelect.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SRC_ROOT = path.resolve(__dirname, "..");
 const TOOL_CACHE_DIR = path.resolve(SRC_ROOT, "tool_cache");
 const LAST_SELECTION_PATH = path.resolve(TOOL_CACHE_DIR, "last_selection.json");
+const CONFIRMED_WORKFLOW_PATH = path.resolve(TOOL_CACHE_DIR, "confirmed_workflow.json");
+
+function collectEndpointsFromWorkflows(workflows) {
+  const endpointSet = new Set();
+  for (const workflow of workflows || []) {
+    for (const step of workflow.steps || []) {
+      const toolKey = String(step?.tool || "").trim();
+      if (toolKey) endpointSet.add(toolKey);
+      const actionKey = String(step?.action || "").trim();
+      if (!toolKey && step?.kind === "runtime_tool" && actionKey) {
+        endpointSet.add(actionKey);
+      }
+      for (const candidate of step?.candidateEndpoints || []) {
+        if (candidate?.key) endpointSet.add(candidate.key);
+      }
+    }
+  }
+  return Array.from(endpointSet);
+}
 
 export function getSelectionPaths() {
   return {
     toolCacheDir: TOOL_CACHE_DIR,
     lastSelectionPath: LAST_SELECTION_PATH,
+    confirmedWorkflowPath: CONFIRMED_WORKFLOW_PATH,
   };
 }
 
@@ -31,6 +58,28 @@ export function saveLastSelection(payload) {
   fs.writeFileSync(LAST_SELECTION_PATH, JSON.stringify(payload, null, 2), "utf8");
 }
 
+export function saveConfirmedWorkflow(payload) {
+  fs.mkdirSync(path.dirname(CONFIRMED_WORKFLOW_PATH), { recursive: true });
+  fs.writeFileSync(
+    CONFIRMED_WORKFLOW_PATH,
+    JSON.stringify(payload, null, 2),
+    "utf8",
+  );
+}
+
+export function clearToolCache() {
+  if (fs.existsSync(TOOL_CACHE_DIR)) {
+    for (const entry of fs.readdirSync(TOOL_CACHE_DIR)) {
+      if (entry === path.basename(CONFIRMED_WORKFLOW_PATH)) {
+        continue;
+      }
+      fs.rmSync(path.join(TOOL_CACHE_DIR, entry), { recursive: true, force: true });
+    }
+  }
+
+  fs.mkdirSync(TOOL_CACHE_DIR, { recursive: true });
+}
+
 export function loadLastSelection() {
   if (!fs.existsSync(LAST_SELECTION_PATH)) {
     throw new Error(`No saved endpoint selection found at ${LAST_SELECTION_PATH}`);
@@ -39,80 +88,98 @@ export function loadLastSelection() {
   return JSON.parse(fs.readFileSync(LAST_SELECTION_PATH, "utf8"));
 }
 
-export async function synthesizeSelection(userQuery) {
-  const query = String(userQuery || "").trim();
-  if (!query) {
-    throw new Error("Missing query.");
+export function loadConfirmedWorkflow() {
+  if (!fs.existsSync(CONFIRMED_WORKFLOW_PATH)) {
+    throw new Error(`No confirmed workflow found at ${CONFIRMED_WORKFLOW_PATH}`);
   }
 
-  const domainAndTags = await classifyDomain(query);
-  let parsedDomain;
+  return JSON.parse(fs.readFileSync(CONFIRMED_WORKFLOW_PATH, "utf8"));
+}
 
-  try {
-    parsedDomain = JSON.parse(domainAndTags.gemini);
-  } catch (err) {
-    throw new Error(`Domain classifier did not return valid JSON: ${err.message}`);
-  }
+function buildSelectionPayload(selection, generation = null) {
+  const query = String(selection?.query || "").trim();
+  const workflowDefinitions = Array.isArray(selection?.workflows)
+    ? selection.workflows
+    : (query
+        ? fallbackWorkflowDecomposition(query)
+        : fallbackWorkflowDecompositionFromEndpoints(selection?.selectedEndpoints || []));
+  const explicitSelectedEndpoints = Array.isArray(selection?.selectedEndpoints)
+    ? selection.selectedEndpoints.filter(Boolean)
+    : [];
+  const normalizedWorkflowDefinitions =
+    workflowDefinitions.length > 0
+      ? workflowDefinitions
+      : createWorkflowFromEndpoints(explicitSelectedEndpoints, query);
+  const selectedEndpoints = explicitSelectedEndpoints.length > 0
+    ? explicitSelectedEndpoints
+    : collectEndpointsFromWorkflows(normalizedWorkflowDefinitions);
 
-  const endpointSelection = await finalEndpoints(query, parsedDomain);
-  const endpointCsv = endpointSelection.success
-    ? endpointSelection.gemini
-    : (endpointSelection.candidateEndpoints || "");
-
-  if (!endpointCsv.trim()) {
-    throw new Error(`Endpoint selection failed: ${endpointSelection.debug}`);
-  }
-
-  const selectedEndpoints = parseEndpointCsv(endpointCsv);
-  const tokenUsage = {
-    input: (endpointSelection.tokenMetrics || 0) + (domainAndTags.tokenMetrics || 0),
-    output: numTokensFromString(endpointCsv) + numTokensFromString(domainAndTags.gemini),
-  };
-
-  return {
+  const payload = {
     query,
-    parsedDomain,
     selectedEndpoints,
-    tokenUsage,
-    debug: endpointSelection.debug,
+    tokenUsage: selection?.tokenUsage || { input: 0, output: 0 },
+    draftWorkflow: selection?.draftWorkflow || null,
+    refinedWorkflow: selection?.refinedWorkflow || null,
+    finalWorkflow: selection?.finalWorkflow || null,
+    workflows: normalizedWorkflowDefinitions,
   };
+
+  if (generation) {
+    payload.generation = {
+      generatedCount: generation.generatedCount,
+      skippedCount: generation.skippedCount,
+      manifestPath: generation.manifestPath,
+    };
+  }
+
+  return payload;
 }
 
 export async function generateFromSelection(selection, options = {}) {
-  const query = String(selection?.query || "").trim();
-  const selectedEndpoints = Array.isArray(selection?.selectedEndpoints)
-    ? selection.selectedEndpoints.filter(Boolean)
-    : [];
+  const payloadBase = buildSelectionPayload(selection);
+  const projectRoot = path.resolve(SRC_ROOT, "..");
+  const candidateWorkflows = await resolveWorkflowCandidatesWithLlm(
+    payloadBase.workflows,
+    projectRoot,
+    {
+      allowedEndpointKeys:
+        payloadBase.selectedEndpoints.length > 0 ? payloadBase.selectedEndpoints : null,
+    },
+  );
+  const selectedEndpoints = payloadBase.selectedEndpoints.length > 0
+    ? payloadBase.selectedEndpoints
+    : collectCandidateEndpointKeys(candidateWorkflows);
+  const query = payloadBase.query;
 
   if (selectedEndpoints.length === 0) {
     throw new Error("No selected endpoints available for generation.");
   }
 
+  clearToolCache();
+
   const generation = await generateMcpTools(selectedEndpoints, options);
-  const payload = {
-    query,
+  await writeWorkflowModules(
+    candidateWorkflows,
+    projectRoot,
     selectedEndpoints,
-    tokenUsage: selection.tokenUsage || { input: 0, output: 0 },
-    generation: {
-      generatedCount: generation.generatedCount,
-      skippedCount: generation.skippedCount,
-      manifestPath: generation.manifestPath,
+  );
+  const payload = buildSelectionPayload(
+    {
+      query,
+      selectedEndpoints,
+      tokenUsage: payloadBase.tokenUsage,
+      draftWorkflow: selection?.draftWorkflow || payloadBase.draftWorkflow || null,
+      refinedWorkflow: selection?.refinedWorkflow || payloadBase.refinedWorkflow || null,
+      finalWorkflow: selection?.finalWorkflow || payloadBase.finalWorkflow || null,
+      workflows: candidateWorkflows,
     },
-  };
+    generation,
+  );
 
   saveLastSelection(payload);
 
   return {
     ...payload,
     generationFull: generation,
-  };
-}
-
-export async function generateFromQuery(userQuery, options = {}) {
-  const selection = await synthesizeSelection(userQuery);
-  const generated = await generateFromSelection(selection, options);
-  return {
-    ...selection,
-    ...generated,
   };
 }

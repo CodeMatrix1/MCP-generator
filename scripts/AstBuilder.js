@@ -1,6 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-const YAML = require("yaml");
+import fs from "fs";
+import path from "path";
+import YAML from "yaml";
+import { logger } from "../src/config/loggerConfig.js";
 
 const dirPath = path.join(".", "Rocket.Chat-Open-API");
 
@@ -19,4 +20,4 @@ for (const file of yamlFiles) {
 
 fs.writeFileSync("data/ast_object.json", JSON.stringify(astObject, null, 2));
 
-console.log("AST objects saved to data/ast_object.json");
+logger.info("AST objects saved to data/ast_object.json");

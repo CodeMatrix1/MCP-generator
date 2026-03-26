@@ -1,40 +1,24 @@
 {
-  "generatedAt": "2026-03-15T14:48:42.933Z",
-  "totalRequested": 11,
-  "generatedCount": 11,
+  "generatedAt": "2026-03-26T13:14:15.304Z",
+  "totalRequested": 3,
+  "generatedCount": 3,
   "skippedCount": 0,
   "generated": [
     {
-      "endpoint": "post-api-v1-channels.create",
-      "method": "POST",
-      "path": "/api/v1/channels.create",
-      "category": "rooms",
-      "functionName": "post_api_v1_channels_create",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/rooms/post_api_v1_channels_create.js"
-    },
-    {
-      "endpoint": "post-api-v1-channels.delete",
-      "method": "POST",
-      "path": "/api/v1/channels.delete",
-      "category": "rooms",
-      "functionName": "post_api_v1_channels_delete",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/rooms/post_api_v1_channels_delete.js"
-    },
-    {
-      "endpoint": "get-api-v1-channels.list",
+      "endpoint": "get-api-v1-users.list",
       "method": "GET",
-      "path": "/api/v1/channels.list",
-      "category": "rooms",
-      "functionName": "get_api_v1_channels_list",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/rooms/get_api_v1_channels_list.js"
+      "path": "/api/v1/users.list",
+      "category": "user_management",
+      "functionName": "get_api_v1_users_list",
+      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/user_management/get_api_v1_users_list.js"
     },
     {
-      "endpoint": "get-api-v1-channels.messages",
-      "method": "GET",
-      "path": "/api/v1/channels.messages",
+      "endpoint": "post-api-v1-channels.invite",
+      "method": "POST",
+      "path": "/api/v1/channels.invite",
       "category": "rooms",
-      "functionName": "get_api_v1_channels_messages",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/rooms/get_api_v1_channels_messages.js"
+      "functionName": "post_api_v1_channels_invite",
+      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/rooms/post_api_v1_channels_invite.js"
     },
     {
       "endpoint": "post-api-v1-chat.postMessage",
@@ -43,54 +27,6 @@
       "category": "messaging",
       "functionName": "post_api_v1_chat_postmessage",
       "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/messaging/post_api_v1_chat_postmessage.js"
-    },
-    {
-      "endpoint": "post-api-v1-chat.update",
-      "method": "POST",
-      "path": "/api/v1/chat.update",
-      "category": "messaging",
-      "functionName": "post_api_v1_chat_update",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/messaging/post_api_v1_chat_update.js"
-    },
-    {
-      "endpoint": "post-api-v1-chat.delete",
-      "method": "POST",
-      "path": "/api/v1/chat.delete",
-      "category": "messaging",
-      "functionName": "post_api_v1_chat_delete",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/messaging/post_api_v1_chat_delete.js"
-    },
-    {
-      "endpoint": "post-api-v1-im.create",
-      "method": "POST",
-      "path": "/api/v1/dm.create",
-      "category": "messaging",
-      "functionName": "post_api_v1_im_create",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/messaging/post_api_v1_im_create.js"
-    },
-    {
-      "endpoint": "post-api-v1-im.delete",
-      "method": "POST",
-      "path": "/api/v1/dm.delete",
-      "category": "messaging",
-      "functionName": "post_api_v1_im_delete",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/messaging/post_api_v1_im_delete.js"
-    },
-    {
-      "endpoint": "get-api-v1-im.list",
-      "method": "GET",
-      "path": "/api/v1/dm.list",
-      "category": "messaging",
-      "functionName": "get_api_v1_im_list",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/messaging/get_api_v1_im_list.js"
-    },
-    {
-      "endpoint": "get-api-v1-im.messages",
-      "method": "GET",
-      "path": "/api/v1/dm.messages",
-      "category": "messaging",
-      "functionName": "get_api_v1_im_messages",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/messaging/get_api_v1_im_messages.js"
     }
   ],
   "skipped": []

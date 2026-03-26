@@ -1,19 +1,27 @@
-import { spawn } from "node:child_process";
+﻿import { spawn } from "node:child_process";
 import fs from "node:fs";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import process from "node:process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 import dotenv from "dotenv";
+import { Command } from "commander";
 import {
-  generateFromQuery,
   generateFromSelection,
+  loadConfirmedWorkflow,
   loadLastSelection,
   parseEndpointCsv,
+  saveConfirmedWorkflow,
 } from "./generation/service.js";
+import {
+  draftSelection,
+  finalizeSelection,
+} from "./selection/service.js";
 import { getRuntimeHost, getRuntimePort } from "./config/ports.js";
 import { syncGeminiExtension } from "./config/geminiExtension.js";
+import { logger } from "./config/loggerConfig.js";
 
 dotenv.config({ quiet: true });
 
@@ -32,10 +40,10 @@ function killPort(port) {
 
     for (const pid of pids.split("\n")) {
       execSync(`kill -9 ${pid}`);
-      console.log(`Killed process ${pid} on port ${port}`);
+      logger.info(`Killed process ${pid} on port ${port}`);
     }
   } catch {
-    console.log(`No process found on port ${port}`);
+    logger.info(`No process found on port ${port}`);
   }
 }
 
@@ -75,9 +83,9 @@ function stopMcpServer() {
   if (pid && isPidRunning(pid)) {
     try {
       process.kill(pid, "SIGTERM");
-      console.log(`Stopped MCP server pid ${pid}`);
+      logger.info(`Stopped MCP server pid ${pid}`);
     } catch (err) {
-      console.error(`Failed to stop MCP server pid ${pid}: ${err.message}`);
+      logger.error(`Failed to stop MCP server pid ${pid}: ${err.message}`);
     }
     removePidFile();
     return;
@@ -86,7 +94,7 @@ function stopMcpServer() {
   removePidFile();
   if (isPortInUse(RUNTIME_PORT)) killPort(RUNTIME_PORT);
 
-  console.log("Runtime MCP server is not running.");
+  logger.info("Runtime MCP server is not running.");
 }
 
 function getServerStatus() {
@@ -108,7 +116,10 @@ function getServerStatus() {
 
 function isPortInUse(port) {
   try {
-    const output = execSync(`lsof -t -i:${port}`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const output = execSync(`lsof -t -i:${port}`, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
     return output.trim().length > 0;
   } catch {
     return false;
@@ -116,104 +127,83 @@ function isPortInUse(port) {
 }
 
 function parseArgs(argv) {
+  const program = new Command();
+
+  program
+    .name("mcp-synth")
+    .allowUnknownOption(true)
+    .argument("[query...]")
+    .option("-q, --query <query>", "User query for endpoint selection")
+    .option(
+      "--endpoints <endpoints>",
+      "Comma-separated endpoint ids to use directly",
+    )
+    .option(
+      "--from-last-selection",
+      "Reuse the most recently generated endpoint set",
+    )
+    .option(
+      "--from-confirmed-workflow",
+      "Resume from the most recently saved draft workflow",
+    )
+    .option(
+      "--draft-only",
+      "Stop after drafting the workflow and save it for approval",
+    )
+    .option(
+      "--auto-approve",
+      "Skip the draft approval prompt and continue automatically",
+    )
+    .option(
+      "--start-server",
+      "Start MCP server after generation or from saved selection",
+    )
+    .option("--stop-server", "Stop the running MCP server")
+    .option(
+      "--restart-server",
+      "Restart the MCP server after generation or from saved selection",
+    )
+    .option("--status", "Show MCP server status")
+    .option("--no-server", "Only run prompting + tool generation")
+    .option("--json", "Print machine-readable JSON summary")
+    .helpOption("-h, --help", "Show this help");
+
+  program.parse([process.argv[0], process.argv[1], ...argv]);
+
+  const options = program.opts();
+  const positionalQuery = program.processedArgs[0]?.join(" ") || "";
   const args = {
-    query: "",
-    endpoints: "",
-    fromLastSelection: false,
-    startServer: true,
-    stopServer: false,
-    restartServer: false,
-    statusOnly: false,
-    json: false,
+    query: typeof options.query === "string" ? options.query : positionalQuery,
+    endpoints: typeof options.endpoints === "string" ? options.endpoints : "",
+    fromLastSelection: Boolean(options.fromLastSelection),
+    fromConfirmedWorkflow: Boolean(options.fromConfirmedWorkflow),
+    draftOnly: Boolean(options.draftOnly),
+    autoApprove: Boolean(options.autoApprove),
+    startServer: options.server,
+    stopServer: Boolean(options.stopServer),
+    restartServer: Boolean(options.restartServer),
+    statusOnly: Boolean(options.status),
+    json: Boolean(options.json),
     help: false,
   };
 
-  const positional = [];
-
-  for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i];
-
-    if (token === "--help" || token === "-h") {
-      args.help = true;
-      continue;
-    }
-
-    if (token === "--no-server") {
-      args.startServer = false;
-      continue;
-    }
-
-    if (token === "--json") {
-      args.json = true;
-      continue;
-    }
-
-    if (token === "--query" || token === "-q") {
-      args.query = argv[i + 1] || "";
-      i += 1;
-      continue;
-    }
-
-    if (token === "--endpoints") {
-      args.endpoints = argv[i + 1] || "";
-      i += 1;
-      continue;
-    }
-
-    if (token === "--from-last-selection") {
-      args.fromLastSelection = true;
-      continue;
-    }
-
-    if (token === "--start-server") {
-      args.startServer = true;
-      continue;
-    }
-
-    if (token === "--stop-server") {
-      args.stopServer = true;
-      args.startServer = false;
-      continue;
-    }
-
-    if (token === "--restart-server") {
-      args.restartServer = true;
-      args.startServer = true;
-      continue;
-    }
-
-    if (token === "--status") {
-      args.statusOnly = true;
-      args.startServer = false;
-      continue;
-    }
-
-    positional.push(token);
+  if (options.startServer) {
+    args.startServer = true;
   }
 
-  if (!args.query && positional.length > 0) {
-    args.query = positional.join(" ");
+  if (args.stopServer) {
+    args.startServer = false;
+  }
+
+  if (args.restartServer) {
+    args.startServer = true;
+  }
+
+  if (args.statusOnly) {
+    args.startServer = false;
   }
 
   return args;
-}
-
-function printHelp() {
-  console.log(`Usage:
-  mcp-synth --query "Create an MCP for channel and users"
-  mcp-synth
-  node src/index.js --query "Create an MCP for channel and users"
-
-Options:
-  -q, --query       User query for endpoint selection
-      --endpoints   Comma-separated endpoint ids to use directly
-      --from-last-selection Reuse the most recently generated endpoint set
-      --status      Show MCP server status
-      --stop-server Stop the running MCP server
-      --restart-server Restart the MCP server after generation or from saved selection
-      --no-server   Only run prompting + tool generation (do not start MCP server)
-      --json        Print machine-readable JSON summary
-  -h, --help        Show this help`);
 }
 
 const formatEndpoints = (str) =>
@@ -224,12 +214,25 @@ const formatEndpoints = (str) =>
     .map((e, i) => `${i + 1}. ${e}`)
     .join("\n");
 
+function summarizeWorkflowDraft(selectionSummary) {
+  return (selectionSummary?.workflows || [])
+    .map((workflow, workflowIndex) => {
+      const steps = (workflow?.steps || [])
+        .map((step, index) => `  ${index + 1}. ${step.key} [${step.kind || "runtime_tool"}] ${step.description}`)
+        .join("\n");
+      return `Workflow ${workflowIndex + 1}: ${workflow?.label || workflow?.key || "Workflow"}\n${steps}`;
+    })
+    .join("\n\n");
+}
+
 function startMcpServer(selectedEndpoints) {
-  console.log("\nStarting runtime MCP server with selected tools...");
+  logger.info("\nStarting runtime MCP server with selected tools...");
   const serverEntry = path.resolve(__dirname, "MCP_Runtime_Server.js");
 
   if (isPortInUse(RUNTIME_PORT)) {
-    console.log(`Runtime MCP server already running on ${RUNTIME_HOST}:${RUNTIME_PORT}. Logs: ${SERVER_LOG_PATH}`);
+    logger.info(
+      `Runtime MCP server already running on ${RUNTIME_HOST}:${RUNTIME_PORT}. Logs: ${SERVER_LOG_PATH}`,
+    );
     return;
   }
 
@@ -247,158 +250,154 @@ function startMcpServer(selectedEndpoints) {
     {
       cwd: path.resolve(__dirname, ".."),
       detached: true,
-      shell: false,
       stdio: ["ignore", logFd, logFd],
-    }
+      env: process.env,
+    },
   );
 
-  writePidFile(proc.pid);
   proc.unref();
   fs.closeSync(logFd);
-  console.log(
-    `Runtime MCP server launched at http://${RUNTIME_HOST}:${RUNTIME_PORT}. Manifest: ${manifestPath}. Logs: ${SERVER_LOG_PATH}`
+  writePidFile(proc.pid);
+
+  logger.info(
+    `Runtime MCP server started on ${RUNTIME_HOST}:${RUNTIME_PORT} (pid ${proc.pid}). Gemini manifest synced at ${manifestPath}`,
   );
 }
 
-async function run() {
-
+async function main() {
   const args = parseArgs(process.argv.slice(2));
-
-  if (args.help) {
-    printHelp();
-    return;
-  }
-
-  if (args.statusOnly) {
-    const status = getServerStatus();
-    if (args.json) {
-      console.log(JSON.stringify(status, null, 2));
-    } else {
-      console.log("Runtime MCP Server Status:");
-      console.log(`PID: ${status.pid ?? "none"}`);
-      console.log(`PID Running: ${status.pidRunning}`);
-      console.log(`Runtime: ${status.runtimeServer.host}:${status.runtimeServer.port}`);
-      console.log(`Runtime In Use: ${status.runtimeServer.portInUse}`);
-      console.log(`Logs: ${status.logPath}`);
-    }
-    return;
-  }
 
   if (args.stopServer) {
     stopMcpServer();
     return;
   }
 
+  if (args.statusOnly) {
+    const status = getServerStatus();
+    const payload = JSON.stringify(status, null, 2);
+    logger.info(payload);
+    return;
+  }
+
+  let selectedEndpoints = [];
+  let selectionSummary = null;
+
+  if (args.endpoints) {
+    selectedEndpoints = parseEndpointCsv(args.endpoints);
+  } else if (args.fromLastSelection) {
+    const lastSelection = loadLastSelection();
+    selectedEndpoints = lastSelection.selectedEndpoints || [];
+    selectionSummary = lastSelection;
+  } else if (args.fromConfirmedWorkflow) {
+    const confirmedWorkflow = loadConfirmedWorkflow();
+    const selection = await finalizeSelection(confirmedWorkflow);
+    selectionSummary = await generateFromSelection(selection);
+    selectedEndpoints = selectionSummary.selectedEndpoints || [];
+  } else {
+    const userQuery = String(args.query || "").trim();
+    if (!userQuery) {
+      const rl = readline.createInterface({ input, output });
+      const answer = await rl.question("What Rocket.Chat MCP do you want to generate? ");
+      rl.close();
+      args.query = answer.trim();
+    }
+
+    const draft = await draftSelection(args.query);
+    saveConfirmedWorkflow(draft);
+
+    if (args.draftOnly) {
+      const draftPayload = {
+        query: draft.query,
+        candidateEndpoints: draft.candidateEndpoints || [],
+        selectedEndpoints: draft.selectedEndpoints || [],
+        tokenUsage: draft.tokenUsage || { input: 0, output: 0 },
+        draftWorkflow: draft.draftWorkflow || null,
+        refinedWorkflow: draft.refinedWorkflow || null,
+        finalWorkflow: draft.finalWorkflow || null,
+        workflows: draft.workflows || [],
+        approvalRequired: true,
+        resumeArgs: ["--from-confirmed-workflow", "--no-server"],
+      };
+
+      if (args.json) {
+        logger.info(JSON.stringify(draftPayload, null, 2));
+        return;
+      }
+
+      logger.info("Draft workflow saved. Review it below and rerun with --from-confirmed-workflow after approval.");
+      logger.info(`\n${summarizeWorkflowDraft(draft)}`);
+      return;
+    }
+
+    let approved = Boolean(args.autoApprove);
+    if (!approved) {
+      logger.info("Draft workflow prepared for approval:");
+      logger.info(`\n${summarizeWorkflowDraft(draft)}`);
+      const rl = readline.createInterface({ input, output });
+      const answer = await rl.question("\nApprove this draft workflow and continue? (y/N) ");
+      rl.close();
+      approved = /^(y|yes)$/i.test(String(answer || "").trim());
+    }
+
+    if (!approved) {
+      logger.info("Draft workflow saved. Rerun with --from-confirmed-workflow after approval.");
+      return;
+    }
+
+    const selection = await finalizeSelection(draft);
+    selectionSummary = await generateFromSelection(selection);
+    selectedEndpoints = selectionSummary.selectedEndpoints || [];
+  }
+
+  if (selectedEndpoints.length === 0) {
+    throw new Error("No endpoints selected or loaded.");
+  }
+
+  if (!selectionSummary) {
+    const generated = await generateFromSelection({
+      query: args.query || "",
+      selectedEndpoints,
+    });
+    selectionSummary = generated;
+  }
+
   if (args.restartServer) {
     stopMcpServer();
   }
 
-  let selectedEndpoints = [];
-  let userQuery = args.query.trim();
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
-  let selectionSource = "query";
-  let selectionSummary = null;
-  let generation = null;
-
-  if (args.endpoints.trim()) {
-    selectedEndpoints = parseEndpointCsv(args.endpoints);
-    selectionSource = "endpoints";
-  } else if (args.fromLastSelection) {
-    const lastSelection = loadLastSelection();
-    selectedEndpoints = Array.isArray(lastSelection.selectedEndpoints)
-      ? lastSelection.selectedEndpoints.filter(Boolean)
-      : [];
-    userQuery = String(lastSelection.query || "").trim();
-    totalInputTokens = Number(lastSelection.tokenUsage?.input || 0);
-    totalOutputTokens = Number(lastSelection.tokenUsage?.output || 0);
-    selectionSource = "last-selection";
+  if (args.startServer !== false) {
+    startMcpServer(selectedEndpoints);
   }
 
-  if (selectedEndpoints.length === 0 && !userQuery) {
-    const rl = readline.createInterface({ input, output });
-    try {
-      userQuery = (await rl.question("Enter user query: ")).trim();
-    } finally {
-      rl.close();
-    }
-  }
+  const responsePayload = {
+    query: selectionSummary.query || args.query || "",
+    selectedEndpoints,
+    tokenUsage: selectionSummary.tokenUsage || { input: 0, output: 0 },
+    draftWorkflow: selectionSummary.draftWorkflow || null,
+    refinedWorkflow: selectionSummary.refinedWorkflow || null,
+    finalWorkflow: selectionSummary.finalWorkflow || null,
+    generation: selectionSummary.generation,
+    workflows: selectionSummary.workflows || [],
+    server: getServerStatus(),
+  };
 
-  if (selectedEndpoints.length === 0 && !userQuery) {
-    console.error("Missing query or endpoints.");
-    process.exitCode = 1;
+  if (args.json) {
+    logger.info(JSON.stringify(responsePayload, null, 2));
     return;
   }
 
-  if (selectionSource === "query") {
-    if (!userQuery) {
-      console.error("Missing query.");
-      process.exitCode = 1;
-      return;
-    }
-    console.log("\nUser Query:", userQuery);
-
-    fs.rmSync(path.join(projectRoot, "src", "tool_cache"), { recursive: true, force: true });
-    killPort(RUNTIME_PORT);
-    selectionSummary = await generateFromQuery(userQuery);
-    console.log("\nSelected Domains:", selectionSummary.parsedDomain);
-    console.log("\nFinal Endpoints:\n" + formatEndpoints(selectionSummary.selectedEndpoints.join(",")));
-
-    totalInputTokens = selectionSummary.tokenUsage.input;
-    totalOutputTokens = selectionSummary.tokenUsage.output;
-    selectedEndpoints = selectionSummary.selectedEndpoints;
-    generation = selectionSummary.generationFull;
-  } else {
-    if (userQuery) {
-      console.log("\nUsing saved query:", userQuery);
-    }
-    console.log(`\nUsing endpoint selection source: ${selectionSource}`);
-    console.log("\nFinal Endpoints:\n" + formatEndpoints(selectedEndpoints.join(",")));
-    const generated = await generateFromSelection({
-      query: userQuery,
-      selectedEndpoints,
-      tokenUsage: {
-        input: totalInputTokens,
-        output: totalOutputTokens,
-      },
-    });
-    generation = generated.generationFull;
-  }
-
-  console.log("\nToken Usage:");
-  console.log("Input:", totalInputTokens);
-  console.log("Output:", totalOutputTokens);
-  console.log("\nSelected Tools:", selectedEndpoints.length);
-
-  console.log(
-    `Generated ${generation.generatedCount} tools, skipped ${generation.skippedCount}. Manifest: ${generation.manifestPath}`
-  );
-
-  if (args.json) {
-    console.log(
-      JSON.stringify(
-        {
-          query: userQuery,
-          selectedEndpoints,
-          tokenUsage: {
-            input: totalInputTokens,
-            output: totalOutputTokens,
-          },
-          generation: {
-            generatedCount: generation.generatedCount,
-            skippedCount: generation.skippedCount,
-            manifestPath: generation.manifestPath,
-          },
-        },
-        null,
-        2
-      )
+  logger.info("\nFinal Endpoints:\n" + formatEndpoints(selectedEndpoints.join(",")));
+  logger.info("\nToken Usage:\n" +
+    `Input: ${responsePayload.tokenUsage.input || 0}\nOutput: ${responsePayload.tokenUsage.output || 0}`);
+  logger.info(`\nSelected Tools: ${selectedEndpoints.length}`);
+  if (responsePayload.generation) {
+    logger.info(
+      `Generated ${responsePayload.generation.generatedCount} tools, skipped ${responsePayload.generation.skippedCount}. Manifest: ${responsePayload.generation.manifestPath}`,
     );
-  }
-
-  if (args.startServer) {
-    startMcpServer(selectedEndpoints);
   }
 }
 
-run();
+main().catch((err) => {
+  logger.error(err?.stack || err?.message || String(err));
+  process.exitCode = 1;
+});

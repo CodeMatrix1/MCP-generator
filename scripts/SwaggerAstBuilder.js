@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import SwaggerParser from "@apidevtools/swagger-parser";
+import { logger } from "../src/config/loggerConfig.js";
 
 const inputDir = "Rocket.Chat-Open-API";
 const outPath = path.join("data", "ast_object.json");
@@ -12,7 +13,7 @@ for (const file of files) {
   if (!file.endsWith(".yaml") && !file.endsWith(".yml")) continue;
 
   const fullPath = path.join(inputDir, file);
-  console.log("Expanding refs for:", file);
+  logger.info(`Expanding refs for: ${file}`);
 
   const dereferenced = await SwaggerParser.dereference(fullPath);
   ast_object[file] = dereferenced;
@@ -20,4 +21,4 @@ for (const file of files) {
 
 fs.writeFileSync(outPath, JSON.stringify(ast_object, null, 2));
 
-console.log("✅ All references expanded.");
+logger.info("All references expanded.");

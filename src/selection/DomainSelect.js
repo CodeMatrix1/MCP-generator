@@ -1,8 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import numTokensFromString from "../LLM_calls/lib/tiktoken-script.js";
-import { runGeminiPrompt, sanitizeGeminiJson } from "../core/llm/geminiCli.js";
+import numTokensFromString from "./lib/tiktoken-script.js";
+import { runGeminiPrompt } from "../core/llm/geminiCli.js";
+import {
+  compileSchema,
+  parseGeminiJsonWithSchema,
+} from "../core/validation/structured.js";
 import { fuzzyMatch, tokenize } from "../core/query/textMatching.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,8 +14,16 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..", "..");
 
 const tagIndex = JSON.parse(
-  fs.readFileSync(path.join(projectRoot, "data", "tag_index.json"), "utf8")
+  fs.readFileSync(path.join(projectRoot, "data", "tag_index.json"), "utf8"),
 );
+
+const validateCategoryTagMap = compileSchema({
+  type: "object",
+  additionalProperties: {
+    type: "array",
+    items: { type: "string" },
+  },
+});
 
 const CATEGORY_HINTS = {
   authentication: ["auth", "login", "token", "session", "password", "2fa"],
@@ -53,7 +65,10 @@ function pickTagsForCategory(category, queryTokens, maxTags = 4) {
     })
     .sort((a, b) => b.score - a.score || a.tag.localeCompare(b.tag));
 
-  const selected = scored.filter((s) => s.score > 0).slice(0, maxTags).map((s) => s.tag);
+  const selected = scored
+    .filter((s) => s.score > 0)
+    .slice(0, maxTags)
+    .map((s) => s.tag);
   if (selected.length > 0) return selected;
 
   return tags.slice(0, Math.min(2, tags.length));
@@ -123,7 +138,9 @@ function classifyDomainFallback(userQuery) {
     .map((entry) => entry.category);
 
   if (selectedCategories.length === 0) {
-    selectedCategories = ["rooms", "messaging", "user-management"].filter((c) => c in tagIndex);
+    selectedCategories = ["rooms", "messaging", "user-management"].filter(
+      (c) => c in tagIndex,
+    );
   }
 
   const result = {};
@@ -141,7 +158,11 @@ export async function classifyDomain(userQuery) {
   try {
     const prompt = buildDomainPrompt(query);
     const raw = await runGeminiPrompt(prompt, 25000, 2 * 1024 * 1024);
-    const parsed = JSON.parse(sanitizeGeminiJson(raw));
+    const parsed = parseGeminiJsonWithSchema(
+      raw,
+      validateCategoryTagMap,
+      "domain selection JSON",
+    );
     const normalized = normalizeCategoryTagMap(parsed);
 
     if (Object.keys(normalized).length > 0) {

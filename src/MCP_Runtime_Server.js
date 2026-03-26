@@ -4,6 +4,7 @@ import path from "path";
 import { pathToFileURL } from "url";
 import dotenv from "dotenv";
 import { getRuntimeHost, getRuntimePort } from "./config/ports.js";
+import { logger } from "./config/loggerConfig.js";
 
 dotenv.config({ quiet: true });
 
@@ -70,6 +71,7 @@ export async function loadTools(dir, allowedTools = null) {
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
+      if (entry.name === "workflows") continue;
       await loadTools(fullPath, allowedTools);
       continue;
     }
@@ -84,7 +86,7 @@ export async function loadTools(dir, allowedTools = null) {
     if (allowedTools && !allowedTools.includes(meta.key)) continue;
 
     registerTool({ ...meta, origin: "generated" }, toolFn);
-    console.log(`Loaded tool: ${meta.key}`);
+    logger.info(`Loaded tool: ${meta.key}`);
   }
 }
 
@@ -121,16 +123,16 @@ const selectedEndpoints = selectedArg
 await loadTools(TOOL_DIR, selectedEndpoints);
 
 const server = app.listen(RUNTIME_PORT, RUNTIME_HOST, () => {
-  console.log(`Runtime MCP Server running at http://${RUNTIME_HOST}:${RUNTIME_PORT}`);
+  logger.info(`Runtime MCP Server running at http://${RUNTIME_HOST}:${RUNTIME_PORT}`);
 });
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
-    console.error(`Runtime MCP Server failed to start: http://${RUNTIME_HOST}:${RUNTIME_PORT} is already in use`);
+    logger.error(`Runtime MCP Server failed to start: http://${RUNTIME_HOST}:${RUNTIME_PORT} is already in use`);
     process.exit(1);
     return;
   }
 
-  console.error("Runtime MCP Server failed to start:", err.message);
+  logger.error(`Runtime MCP Server failed to start: ${err.message}`);
   process.exit(1);
 });

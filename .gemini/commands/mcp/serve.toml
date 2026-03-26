@@ -1,0 +1,59 @@
+description = "Use the running Rocket.Chat MCP server for live actions."
+
+prompt = """
+You handle live Rocket.Chat actions through the running MCP server for this repo using the local MCP bridge script.
+
+Flow
+- Treat {{args}} as the exact user request.
+- Do not rewrite or expand {{args}}.
+- This is live-action mode, not generation mode.
+- Do not mention `--from-last-selection`, regeneration, or startup unless the runtime server is missing or the requested capability is unavailable.
+- First call the overview tool through the bridge.
+- Use it as the single source for server status, auth status, and runtime validation.
+- If `authStatus.configured` is false, ask the user in one concise message for the missing fields only.
+- Use this exact shape when asking:
+  `I need Rocket.Chat auth to do that. Send the missing values: <field list>.`
+- After the user replies, immediately call the overview tool again with the auth fields to configure auth and refresh the full status snapshot.
+- Inspect saved serve-only workflows first.
+- If a saved workflow matches the user's request, execute the workflow through the bridge.
+- Only fall back to single-tool execution when no saved workflow fits.
+- Use the saved endpoint selection in src/tool_cache/last_selection.json as context only, never as a reason to restart or regenerate during a normal live action.
+- Do not read repo source files unless the live tool call fails.
+- If the action fails due to authorization, ask for any missing auth values, call the overview tool with them, and retry once.
+
+Output rules
+- Be concise.
+- Say which tool was used.
+- Summarize the result for the user.
+- If a required capability is missing from the live tool list, say that briefly and tell the user to run /mcp:generate to update the MCP.
+- If auth is missing, do not explain synthesis or server setup first. Ask for auth values first.
+
+Execution endpoints
+- Get combined status/auth/validation:
+  node src/cli/mcp-call.js rc.server.overview
+- Configure auth and refresh combined status:
+  node src/cli/mcp-call.js rc.server.overview '{"baseUrl":"http://localhost:3000","authToken":"...","userId":"..."}'
+- Inspect saved serve-only workflows.
+  node src/cli/mcp-call.js rc.list_workflows
+- Execute a saved serve-only workflow when it matches the request.
+  node src/cli/mcp-call.js rc.execute_workflow '{
+    "workflow":"onboard_member",
+    "input":{"username":"new_user","channelName":"team-updates","welcomeMessage":"Welcome aboard!"}
+  }'
+- If no workflow fits, inspect available tools.
+  node src/cli/mcp-call.js rc.list_tools
+- Determine the correct tool executions with arguments in order using the tool metadata.
+-execute them one at a time with an explicit `tool` key and schema-correct args
+  Example:
+  node src/cli/mcp-call.js rc.execute_action '{
+    "tool":"post-api-v1-chat.postMessage",
+    "args":{"channel":"#made_with_gemini","text":"hi"}
+  }'
+
+Failure policy
+- If the MCP server is not running or /tools is unavailable, say so briefly and tell the user to run /mcp:generate then "start".
+- If a tool call returns an error, report the error briefly and do not invent success.
+
+Live context:
+!{if [ -f src/tool_cache/last_selection.json ]; then cat src/tool_cache/last_selection.json; else printf "__NO_LAST_SELECTION__"; fi}
+"""

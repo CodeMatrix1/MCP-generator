@@ -5,26 +5,60 @@ You handle Rocket.Chat MCP generation for this repo through the local generation
 
 Flow
 - On slash use, ask:
-  "What should this MCP handle in Rocket.Chat? Mention entities + actions."
+  "What exact Rocket.Chat workflow should this MCP support? Describe the entities and actions in order."
 - If there is no query yet, ask and stop.
 - Treat {{args}} as the exact user query.
 - Do not rewrite or expand {{args}}.
-- Use `node scripts/mcp-generate.js plan "{{args}}"` to synthesize endpoint selection for the raw query from scratch.
-- Use command output as source of truth.
-- Show inferred tags first, then selected endpoints, then a short capability summary.
-- Keep the response concise and decision-focused.
+- Stage 1 is workflow decomposition only. Run this commander-style command:
+  `node src/cli/mcp-generate.js plan "{{args}}"`
+- Use the plan output as the only source of truth for workflow confirmation.
+- In Stage 1, do not mention selected endpoints unless the command output explicitly requires it. The user should be confirming workflow structure, not endpoint picks.
+- Present the workflow confirmation in this exact order:
+  Requirement:
+  Workflow name
+  Description
+  Inputs
+  Steps
+- For each workflow, show:
+  - workflow key as the function name
+  - a one-line description
+  - each input with type, whether it is required, and default if present
+  - each step as an ordered list in this exact style:
+    `1. <step key> — <step description> → <step action>`
+- The confirmation must read like a decomposed workflow function draft, not an endpoint plan.
+- Ask the user to confirm that this workflow function matches the intended workflow exactly before any endpoint resolution or code generation happens.
+- Keep Stage 1 concise and decision-focused.
 
 Iteration
-- End with:
-  "say 'start' to apply and start the runtime MCP, or mention endpoint/workflow changes"
-- If the user provides changes, rerun planning with the updated raw query.
-- Do not apply changes until the user says exactly "start".
+- If the user wants changes, rerun only Stage 1 with the updated raw query and show the revised workflow draft again.
+- Do not resolve endpoints, generate tools, or write workflow files until the workflow itself is confirmed.
+- End Stage 1 with:
+  "confirm this workflow if it matches exactly, or mention workflow changes"
+- Do not tell the user to say `start` yet.
+
+Apply After Confirmation
+- Only after the user clearly confirms the workflow draft, explain that the next step will:
+  - send the confirmed workflow through the generation pipeline
+  - deterministically map each workflow step to a small set of candidate Rocket.Chat endpoints
+  - generate the required runtime tools for those candidate endpoints
+  - run the workflow-code generation prompt so the workflow chooses the right endpoint per step using schema context
+  - validate the generated workflow before saving it
+  - write serve-only workflow functions under `src/tool_cache/workflows`
+- After that explanation, end with:
+  "say `start` to generate the MCP from this confirmed workflow and start it"
+- If the user provides changes instead of confirmation, return to Stage 1 and rerun planning with the updated raw query.
+- Do not apply generation until the user has explicitly confirmed the exact intended workflow.
 
 Apply
-- Only if the user reply is exactly "start", run one local command:
-  `node scripts/mcp-generate.js apply-and-start --from-last-selection`
-- Explain that `--from-last-selection` is only reusing the just-generated endpoint set for runtime startup inside that single local command.
-- After start, confirm the generated tool count and tell the user to switch to `/mcp:execute` for live actions.
+- Only if the user reply is exactly `start`, run this commander-style command:
+  `node src/cli/mcp-generate.js apply-and-start --from-confirmed-workflow`
+- Explain that `--from-confirmed-workflow` is loading the just-confirmed workflow draft, then triggering the second-stage generation flow:
+  - candidate endpoints are pulled for each workflow step
+  - runtime tools are generated for those candidates
+  - the workflow code-generation prompt runs with that endpoint context
+  - the generated workflow is validated before being saved
+  - tools and serve-only workflow functions are written locally
+- After start, confirm the generated tool count, mention that workflow functions were written under `src/tool_cache/workflows`, and tell the user to switch to `/mcp:serve` for live workflow execution.
 
 Failure policy
 - If planning, apply, or start fails, report the real error briefly and do not invent success.

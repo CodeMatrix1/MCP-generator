@@ -2,3 +2,5 @@
 /data
 /node_modules
 /Rocket.Chat-Open-API
+.vscode
+AGENTS.md

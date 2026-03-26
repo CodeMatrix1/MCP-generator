@@ -1,0 +1,252 @@
+{
+  "query": "onboard a new user(create if doesnt exist) to a channel(create if not exists) with a welcome message",
+  "parsedDomain": {
+    "messaging": [
+      "Chat",
+      "DM"
+    ],
+    "rooms": [
+      "Channels"
+    ],
+    "user-management": [
+      "Users"
+    ]
+  },
+  "candidateEndpoints": [
+    "post-api-v1-chat.delete",
+    "post-api-v1-chat.react",
+    "post-api-v1-chat.update",
+    "post-api-v1-chat.reportMessage",
+    "post-api-v1-chat.followMessage",
+    "post-api-v1-chat.unfollowMessage",
+    "get-api-v1-chat.getMessage",
+    "get-chat.getThreadsList",
+    "get-api-v1-chat.getDeletedMessages",
+    "get-api-v1-chat.getDiscussions",
+    "get-api-v1-chat.getMentionedMessages",
+    "get-api-v1-chat.getMessageReadReceipts",
+    "get-api-v1-chat.getPinnedMessages",
+    "get-api-v1-chat.getStarredMessages",
+    "get-api-v1-chat.getThreadMessages",
+    "get-api-v1-chat.ignoreUser",
+    "post-api-v1-chat.pinMessage",
+    "post-api-v1-chat.unPinMessage",
+    "post-api-v1-chat.postMessage",
+    "get-api-v1-chat.search",
+    "post-api-v1-chat.sendMessage",
+    "post-api-v1-chat.starMessage",
+    "post-api-v1-chat.unStarMessage",
+    "get-api-v1-chat.syncThreadsList",
+    "get-api-v1-chat.syncThreadMessages",
+    "get-api-v1-chat.syncMessages",
+    "get-api-v1-chat.getURLPreview",
+    "post-api-v1-im.close",
+    "get-api-v1-im.counters",
+    "post-api-v1-im.create",
+    "post-api-v1-im.delete",
+    "get-api-v1-im.files",
+    "get-api-v1-im.history",
+    "get-api-v1-im.list.everyone",
+    "get-api-v1-im.list",
+    "get-api-v1-im.members",
+    "get-api-v1-im.messages",
+    "get-api-v1-im.messages.others",
+    "post-api-v1-im.open",
+    "post-api-v1-im.setTopic",
+    "post-api-v1-channels.create",
+    "post-api-v1-channels.addAll",
+    "post-api-v1-channels.addLeader",
+    "post-api-v1-channels.addModerator",
+    "post-api-v1-channels.addOwner",
+    "get-api-v1-channels.anonymousread",
+    "post-api-v1-channels.archive",
+    "post-api-v1-channels.close",
+    "get-api-v1-channels.counters",
+    "post-api-v1-channels.delete",
+    "get-api-v1-channels.files",
+    "get-api-v1-channels.history",
+    "get-api-v1-channels.info",
+    "post-api-v1-channels.invite",
+    "post-api-v1-channels.join",
+    "post-api-v1-channels.kick",
+    "post-api-v1-channels.leave",
+    "get-api-v1-channels.list.joined",
+    "get-api-v1-channels.list",
+    "get-api-v1-channels.members",
+    "get-api-v1-channels.messages",
+    "get-api-v1-channels.moderators",
+    "get-api-v1-channels.online",
+    "post-api-v1-channels.open",
+    "post-api-v1-channels.removeLeader",
+    "post-api-v1-channels.removeModerator",
+    "post-api-v1-channels.removeOwner",
+    "pos-api-v1-channels.rename",
+    "get-api-v1-channels.roles",
+    "post-api-v1-channels.setAnnouncement",
+    "post-api-v1-channels.setCustomFields",
+    "post-api-v1-channels.setDefault",
+    "post-api-v1-channels.setDescription",
+    "post-api-v1-channels.setJoinCode",
+    "post-api-v1-channels.setPurpose",
+    "post-api-v1-channels.setReadOnly",
+    "post-api-v1-channels.setTopic",
+    "post-api-v1-channels.setType",
+    "post-api-v1-channels.unarchive",
+    "get-api-v1-channels.getAllUserMentionsByChannel",
+    "get-api-v1-channels.getIntegrations",
+    "post-api-v1-channels.convertToTeam",
+    "post-api-v1-users.create",
+    "post-api-v1-users.register",
+    "post-api-v1-users.update",
+    "post-api-v1-users.updateOwnBasicInfo",
+    "get-api-v1-users.info",
+    "get-api-v1-users.list",
+    "post-api-v1-users.setAvatar",
+    "get-api-v1-users.getAvatar",
+    "post-api-v1-users.resetAvatar",
+    "post-api-v1-users.setStatus",
+    "get-api-v1-users.getStatus",
+    "post-api-v1-users.setActiveStatus",
+    "post-api-v1-users.deactivateIdle",
+    "get-api-v1-users.getPresence",
+    "get-api-v1-users.presence",
+    "post-api-v1-users.delete",
+    "post-api-v1-users.deleteOwnAccount",
+    "post-api-v1-users.createToken",
+    "get-api-v1-users.getPreferences",
+    "post-api-v1-users.setPreferences",
+    "post-api-v1-users.forgotPassword",
+    "get-api-v1-users.getUsernameSuggestion",
+    "get-api-v1-users.getAvatarSuggestion",
+    "get-api-v1-users.checkUsernameAvailability",
+    "post-api-v1-users.generatePersonalAccessToken",
+    "post-api-v1-users.regeneratePersonalAccessToken",
+    "get-api-v1-users.getPersonalAccessTokens",
+    "post-api-v1-users.removePersonalAccessToken",
+    "get-api-v1-users.requestDataDownload",
+    "post-api-v1-users.logoutOtherClients",
+    "get-api-v1-users.autocomplete",
+    "post-api-v1-users.removeOtherTokens",
+    "post-api-v1-users.resetE2EKey",
+    "post-api-v1-users.resetTOTP",
+    "get-api-v1-users.listTeams",
+    "post-api-v1-moderation.reportUser",
+    "post-api-v1-users.logout",
+    "get-api-v1-avatar-subject",
+    "get-api-v1-users.sendWelcomeEmail",
+    "post-api-v1-sendInvitationEmail",
+    "post-api-v1-users.sendConfirmationEmail",
+    "get-api-v1-users.listByStatus"
+  ],
+  "selectedEndpoints": [],
+  "draftWorkflow": {
+    "key": "onboard_member",
+    "label": "Onboard Member",
+    "description": "Onboard a member, ensure the destination channel exists, and send a welcome message.",
+    "scope": "serve-only",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "username",
+        "channel_name",
+        "welcome_message"
+      ],
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "The username of the member to onboard."
+        },
+        "channel_name": {
+          "type": "string",
+          "description": "The channel to join or create."
+        },
+        "welcome_message": {
+          "type": "string",
+          "description": "The welcome message to post after onboarding."
+        }
+      }
+    },
+    "steps": [
+      {
+        "key": "lookup_user",
+        "description": "Look up the user by username.",
+        "action": "user.lookup"
+      },
+      {
+        "key": "ensure_channel",
+        "description": "Ensure the target channel exists.",
+        "action": "channel.ensure"
+      },
+      {
+        "key": "invite_member",
+        "description": "Add the user to the target channel.",
+        "action": "channel.invite_member"
+      },
+      {
+        "key": "send_welcome_message",
+        "description": "Send the welcome message in the target channel.",
+        "action": "message.send"
+      }
+    ]
+  },
+  "refinedWorkflow": null,
+  "finalWorkflow": null,
+  "workflows": [
+    {
+      "key": "onboard_member",
+      "label": "Onboard Member",
+      "description": "Onboard a member, ensure the destination channel exists, and send a welcome message.",
+      "scope": "serve-only",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "username",
+          "channel_name",
+          "welcome_message"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "The username of the member to onboard."
+          },
+          "channel_name": {
+            "type": "string",
+            "description": "The channel to join or create."
+          },
+          "welcome_message": {
+            "type": "string",
+            "description": "The welcome message to post after onboarding."
+          }
+        }
+      },
+      "steps": [
+        {
+          "key": "lookup_user",
+          "description": "Look up the user by username.",
+          "action": "user.lookup"
+        },
+        {
+          "key": "ensure_channel",
+          "description": "Ensure the target channel exists.",
+          "action": "channel.ensure"
+        },
+        {
+          "key": "invite_member",
+          "description": "Add the user to the target channel.",
+          "action": "channel.invite_member"
+        },
+        {
+          "key": "send_welcome_message",
+          "description": "Send the welcome message in the target channel.",
+          "action": "message.send"
+        }
+      ]
+    }
+  ],
+  "refinement": {},
+  "tokenUsage": {
+    "input": 22,
+    "output": 1513
+  },
+  "debug": "finalize_draft"
+}

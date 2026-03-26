@@ -4,36 +4,47 @@
   "main": "index.js",
   "type": "module",
   "bin": {
-    "mcp-synth": "./bin/mcp-synth.js"
+    "mcp-synth": "./bin/mcp-synth.js",
+    "mcp-generate": "./src/cli/mcp-generate.js",
+    "mcp-call": "./src/cli/mcp-call.js",
+    "mcp-runtime-call": "./src/cli/mcp-runtime-call.js"
   },
   "scripts": {
     "ast:parse": "ts-node AST-Parser.ts",
     "ast:prompt": "node LLM-1-Prompt-Gen.js",
     "mcp:prompt": "node src/index.js",
     "mcp:prompt:only": "node src/index.js --no-server",
-    "mcp:call": "node scripts/mcp-call.js",
-    "mcp:runtime:call": "node scripts/mcp-runtime-call.js",
-    "mcp:generate": "node scripts/mcp-generate.js",
+    "mcp:call": "node src/cli/mcp-call.js",
+    "mcp:runtime:call": "node src/cli/mcp-runtime-call.js",
+    "mcp:generate": "node src/cli/mcp-generate.js",
     "mcp:status": "node src/index.js --status",
     "mcp:stop": "node src/index.js --stop-server",
     "typecheck": "tsc --noEmit",
-    "test": "node --test ./tests/runtime-tools.test.js"
+    "test": "node --test ./tests/*.test.js",
+    "mcp:generate:plan": "node src/cli/mcp-generate.js plan",
+    "mcp:generate:apply": "node src/cli/mcp-generate.js apply",
+    "mcp:generate:start": "node src/cli/mcp-generate.js apply-and-start"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@apidevtools/swagger-parser": "^12.1.0",
     "@dqbd/tiktoken": "^1.0.22",
+    "@langchain/langgraph": "^1.2.5",
+    "ajv": "^8.18.0",
     "child-process": "^1.0.2",
+    "commander": "^13.1.0",
     "dotenv": "^17.3.1",
     "express": "^4.19.2",
+    "handlebars": "^4.7.8",
     "kill-port": "^2.0.1",
+    "openapi-typescript": "^7.13.0",
     "shutil": "^0.0.1",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
     "@types/node": "^25.3.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

@@ -1,0 +1,240 @@
+import { runGeminiPrompt } from "../../core/llm/geminiCli.js";
+
+export const workflow = {{{workflowLiteral}}};
+
+export const meta = {
+  key: workflow.key,
+  label: workflow.label,
+  description: workflow.description,
+  scope: workflow.scope || "serve-only",
+  inputSchema: workflow.inputSchema || null,
+};
+
+const workflowInputSchema = {{{inputSchemaLiteral}}};
+
+function getValueByPath(source, pathExpression) {
+  const normalizedPath = String(pathExpression || "")
+    .replace(/\[(\d+)\]/g, ".$1")
+    .replace(/^\.+|\.+$/g, "");
+
+  if (!normalizedPath) return source;
+
+  return normalizedPath.split(".").reduce((value, segment) => {
+    if (value === null || value === undefined) return undefined;
+    return value[segment];
+  }, source);
+}
+
+function resolveTemplateValue(template, state) {
+  if (Array.isArray(template)) {
+    return template.map((entry) => resolveTemplateValue(entry, state));
+  }
+
+  if (template && typeof template === "object") {
+    return Object.fromEntries(
+      Object.entries(template).map(([key, value]) => [
+        key,
+        resolveTemplateValue(value, state),
+      ]),
+    );
+  }
+
+  if (typeof template !== "string") {
+    return template;
+  }
+
+  const exactMatch = template.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
+  if (exactMatch) {
+    return getValueByPath(state, exactMatch[1]);
+  }
+
+  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, expression) => {
+    const value = getValueByPath(state, expression);
+    return value === undefined || value === null ? "" : String(value);
+  });
+}
+
+function applyInputDefaults(schema, input = {}) {
+  const result = { ...(input || {}) };
+  const properties = schema?.properties && typeof schema.properties === "object"
+    ? schema.properties
+    : {};
+
+  for (const [name, fieldSchema] of Object.entries(properties)) {
+    if (result[name] === undefined && fieldSchema && typeof fieldSchema === "object" && "default" in fieldSchema) {
+      result[name] = fieldSchema.default;
+    }
+  }
+
+  return result;
+}
+
+function validateWorkflowInput(schema, input) {
+  const required = Array.isArray(schema?.required) ? schema.required : [];
+  const missing = required.filter((field) => {
+    const value = input[field];
+    return value === undefined || value === null || value === "";
+  });
+
+  if (missing.length > 0) {
+    throw new Error(`Missing workflow input field(s): ${missing.join(", ")}`);
+  }
+}
+
+function assertRequiredResultPaths(requiredPaths, result, stepKey) {
+  for (const requiredPath of requiredPaths || []) {
+    if (getValueByPath(result, requiredPath) === undefined) {
+      throw new Error(`Workflow step ${stepKey} did not produce required result path: ${requiredPath}`);
+    }
+  }
+}
+
+function buildStepContext(helpers, overrides = {}) {
+  if (typeof helpers.buildStepContext === "function") {
+    return helpers.buildStepContext(overrides);
+  }
+
+  return {
+    ...(helpers.context || {}),
+    ...(overrides || {}),
+  };
+}
+
+function buildFailure(stepKey, error) {
+  const message = error instanceof Error ? error.message : String(error || "Workflow step failed.");
+  return {
+    status: "error",
+    failedStep: stepKey,
+    error: message,
+    isError: true,
+    content: [{ type: "text", text: message }],
+  };
+}
+
+function buildLocalSummary(value) {
+  if (Array.isArray(value)) {
+    return `Processed ${value.length} items.`;
+  }
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value);
+    return `Processed an object result with keys: ${keys.slice(0, 8).join(", ")}.`;
+  }
+  return String(value || "").slice(0, 500);
+}
+
+async function invokeGeneratedLlmStep(step, state, helpers = {}) {
+  if (typeof helpers.invokeLlmWorkflowStep === "function") {
+    return helpers.invokeLlmWorkflowStep(step, state);
+  }
+
+  const dependsOnKey = String((Array.isArray(step?.dependsOn) ? step.dependsOn[0] : step?.dependsOn) || "").trim();
+  const fallbackSource = dependsOnKey
+    ? state.steps[dependsOnKey]?.result
+    : [...Object.values(state.steps)].at(-1)?.result;
+  const fallbackInputReference = dependsOnKey
+    ? ("{" + "{steps." + dependsOnKey + ".result}" + "}")
+    : ("{" + "{inputs}" + "}");
+  const prompt = String(
+    resolveTemplateValue(
+      step?.promptTemplate ||
+        `Complete this workflow step: ${step?.action || "llm_step"}\nDescription: ${step?.description || ""}\nInput:\n${fallbackInputReference}`,
+      state,
+    ) || "",
+  ).trim();
+
+  if (!prompt) {
+    return {
+      text: buildLocalSummary(fallbackSource),
+      mode: "fallback",
+    };
+  }
+
+  try {
+    const text = typeof helpers.runGeminiPrompt === "function"
+      ? await helpers.runGeminiPrompt(prompt)
+      : await runGeminiPrompt(prompt, 30000, 2 * 1024 * 1024);
+    return {
+      text: String(text || "").trim(),
+      mode: "gemini",
+    };
+  } catch {
+    return {
+      text: buildLocalSummary(fallbackSource),
+      mode: "fallback",
+    };
+  }
+}
+
+export default async function executeGeneratedWorkflow(input = {}, helpers = {}) {
+  const resolvedInput = applyInputDefaults(workflowInputSchema, input);
+  validateWorkflowInput(workflowInputSchema, resolvedInput);
+
+  const state = {
+    inputs: resolvedInput,
+    steps: {},
+  };
+  const steps = [];
+
+{{#each steps}}
+  // Step {{number}}: {{description}}
+  // Purpose: {{purpose}}
+{{#if isRuntime}}
+  const {{argsVar}} = resolveTemplateValue({{{argsLiteral}}}, state);
+  const {{contextInputVar}} = resolveTemplateValue({{{contextLiteral}}}, state);
+  const {{contextVar}} = buildStepContext(helpers, {{contextInputVar}});
+  try {
+    const {{resultVar}} = await helpers.invokeRuntimeTool({{{toolLiteral}}}, {{argsVar}}, {{contextVar}});
+    assertRequiredResultPaths({{{requiredResultPathsLiteral}}}, {{resultVar}}, {{{stepKeyLiteral}}});
+    state.steps[{{{stepKeyLiteral}}}] = {
+      key: {{{stepKeyLiteral}}},
+      tool: {{{toolLiteral}}},
+      args: {{argsVar}},
+      context: {{contextVar}},
+      status: "ok",
+      result: {{resultVar}},
+    };
+    steps.push(state.steps[{{{stepKeyLiteral}}}]);
+  } catch (error) {
+    state.steps[{{{stepKeyLiteral}}}] = {
+      key: {{{stepKeyLiteral}}},
+      tool: {{{toolLiteral}}},
+      args: {{argsVar}},
+      context: {{contextVar}},
+      status: {{continueOnErrorLiteral}} ? "ignored_error" : "error",
+      error: error instanceof Error ? error.message : String(error || "Workflow step failed."),
+    };
+    steps.push(state.steps[{{{stepKeyLiteral}}}]);
+    if (!{{continueOnErrorLiteral}}) {
+      return buildFailure({{{stepKeyLiteral}}}, error);
+    }
+  }
+{{else}}
+  try {
+    const {{resultVar}} = await invokeGeneratedLlmStep({{{llmStepLiteral}}}, state, helpers);
+    state.steps[{{{stepKeyLiteral}}}] = {
+      key: {{{stepKeyLiteral}}},
+      action: {{{actionLiteral}}},
+      kind: "llm_step",
+      status: "ok",
+      result: {{resultVar}},
+    };
+    steps.push(state.steps[{{{stepKeyLiteral}}}]);
+  } catch (error) {
+    return buildFailure({{{stepKeyLiteral}}}, error);
+  }
+{{/if}}
+
+{{/each}}
+  const lastSuccessfulStep = [...steps].reverse().find((step) => step.status === "ok");
+  return {
+    status: "ok",
+    workflow: {
+      key: workflow.key,
+      label: workflow.label,
+      description: workflow.description,
+    },
+    input: resolvedInput,
+    steps,
+    result: lastSuccessfulStep?.result ?? null,
+  };
+}

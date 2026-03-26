@@ -1,0 +1,26 @@
+import { executeToolRequest } from '../../Tool_gen/Lib/ToolInternals.js';
+
+const TOOL_KEY = {{{toolKeyLiteral}}};
+const METHOD = {{{methodLiteral}}};
+const ROUTE_PATH = {{{routePathLiteral}}};
+
+export const meta = {
+  key: TOOL_KEY,
+  method: METHOD,
+  path: ROUTE_PATH,
+  summary: {{{summaryLiteral}}},
+  input: {{{inputMetaLiteral}}},
+  output: {{{outputMetaLiteral}}},
+};
+
+export async function {{functionName}}(args = {}, context = {}) {
+  return executeToolRequest({
+    toolKey: TOOL_KEY,
+    method: METHOD,
+    routePath: ROUTE_PATH,
+    args,
+    context,
+  });
+}
+
+export default {{functionName}};

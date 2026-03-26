@@ -2,8 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildEndpointList, TagsToEndpoints } from "./lib/TagsToEndpoints.js";
-import numTokensFromString from "../LLM_calls/lib/tiktoken-script.js";
-import { runGeminiPrompt, sanitizeGeminiJson } from "../core/llm/geminiCli.js";
+import numTokensFromString from "./lib/tiktoken-script.js";
+import { runGeminiPrompt } from "../core/llm/geminiCli.js";
+import {
+  compileSchema,
+  parseGeminiJsonWithSchema,
+} from "../core/validation/structured.js";
 import { tokenize } from "../core/query/textMatching.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,14 +15,29 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..", "..");
 
 const endpointIndex = JSON.parse(
-  fs.readFileSync(path.join(projectRoot, "data", "endpoint_index.json"), "utf8")
+  fs.readFileSync(
+    path.join(projectRoot, "data", "endpoint_index.json"),
+    "utf8",
+  ),
 );
+const validateOperationSelection = compileSchema({
+  type: "object",
+  properties: {
+    operationIds: {
+      type: "array",
+      items: { type: "string" },
+    },
+  },
+  required: ["operationIds"],
+  additionalProperties: true,
+});
 
 function scoreEndpoint(operationId, queryTokens) {
   const ep = endpointIndex[operationId];
   if (!ep) return -1;
 
-  const searchable = `${ep.summary || ""} ${ep.path || ""} ${(ep.tags || []).join(" ")} ${operationId}`.toLowerCase();
+  const searchable =
+    `${ep.summary || ""} ${ep.path || ""} ${(ep.tags || []).join(" ")} ${operationId}`.toLowerCase();
   let score = 0;
 
   for (const token of queryTokens) {
@@ -29,21 +48,27 @@ function scoreEndpoint(operationId, queryTokens) {
   return score;
 }
 
-function chooseEndpointsFallback(candidateIds, userQuery, minKeep = 6, maxKeep = 20) {
+function chooseEndpointsFallback(
+  candidateIds,
+  userQuery,
+  minKeep = 6,
+  maxKeep = 20,
+) {
   const queryTokens = tokenize(userQuery);
   const scored = candidateIds
-    // .map((id) => ({ id, score: scoreEndpoint(id, queryTokens) }))
-    // .filter((entry) => entry.score >= 0)
-    // .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+    .map((id) => ({ id, score: scoreEndpoint(id, queryTokens) }))
+    .filter((entry) => entry.score >= 0)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
 
   const positive = scored.filter((entry) => entry.score > 0);
   if (positive.length > 0) {
-    // const keepCount = Math.max(minKeep, Math.min(maxKeep, positive.length));
-    // return positive.slice(0, keepCount).map((entry) => entry.id);
-    return positive;
+    const keepCount = Math.max(minKeep, Math.min(maxKeep, positive.length));
+    return positive.slice(0, keepCount).map((entry) => entry.id);
   }
 
-  return scored.slice(0, Math.min(minKeep, scored.length)).map((entry) => entry.id);
+  return scored
+    .slice(0, Math.min(minKeep, scored.length))
+    .map((entry) => entry.id);
 }
 
 function buildEndpointPrompt(userQuery, candidateIds) {
@@ -115,11 +140,19 @@ export async function finalEndpoints(userQuery, tags) {
 
   try {
     const prompt = buildEndpointPrompt(userQuery, candidateIds);
+    finalOutput.push("Running Gemini endpoint selection prompt.");
     const raw = await runGeminiPrompt(prompt);
-    const parsed = JSON.parse(sanitizeGeminiJson(raw));
+    finalOutput.push("Gemini endpoint selection completed.");
+    const parsed = parseGeminiJsonWithSchema(
+      raw,
+      validateOperationSelection,
+      "endpoint selection JSON",
+    );
     selected = normalizeOperationIds(parsed, candidateSet);
   } catch {
-    // Fallback when gemini fails or returns invalid payload.
+    finalOutput.push(
+      "run selecting from endpoints retrieved from tags failed.",
+    );
   }
 
   if (selected.length === 0) {

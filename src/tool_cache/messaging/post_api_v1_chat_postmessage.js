@@ -1,8 +1,8 @@
-import { interpolatePath , resolveBaseUrl , encodeQuery } from '../../Tool_gen/Lib/ToolInternals.js';  
+import { executeToolRequest } from '../../Tool_gen/Lib/ToolInternals.js';
 
+const TOOL_KEY = "post-api-v1-chat.postMessage";
 const METHOD = "POST";
 const ROUTE_PATH = "/api/v1/chat.postMessage";
-const TOOL_KEY = "post-api-v1-chat.postMessage";
 
 export const meta = {
   key: TOOL_KEY,
@@ -99,6 +99,10 @@ export const meta = {
                   "type": "array",
                   "items": {
                     "type": "object",
+                    "required": [
+                      "title",
+                      "value"
+                    ],
                     "properties": {
                       "short": {
                         "type": "boolean",
@@ -112,11 +116,7 @@ export const meta = {
                         "type": "string",
                         "description": "The value of this field, displayed underneath the title value."
                       }
-                    },
-                    "required": [
-                      "title",
-                      "value"
-                    ]
+                    }
                   }
                 },
                 "image_url": {
@@ -236,6 +236,10 @@ export const meta = {
                   "type": "array",
                   "items": {
                     "type": "object",
+                    "required": [
+                      "title",
+                      "value"
+                    ],
                     "properties": {
                       "short": {
                         "type": "boolean",
@@ -249,11 +253,7 @@ export const meta = {
                         "type": "string",
                         "description": "The value of this field, displayed underneath the title value."
                       }
-                    },
-                    "required": [
-                      "title",
-                      "value"
-                    ]
+                    }
                   }
                 },
                 "image_url": {
@@ -305,64 +305,207 @@ export const meta = {
         }
       }
     ]
+  },
+  "requestExample": {
+    "alias": "Gruggy",
+    "avatar": "http://res.guggy.com/logo_128.png",
+    "channel": "#general",
+    "emoji": ":smirk:",
+    "roomId": "Xnb2kLD2Pnhdwe3RH",
+    "text": "Sample message",
+    "attachments": [
+      {
+        "audio_url": "http://www.w3schools.com/tags/horse.mp3",
+        "author_icon": "https://avatars.githubusercontent.com/u/850391?v=3",
+        "author_link": "https://rocket.chat/",
+        "author_name": "Bradley Hilton",
+        "collapsed": false,
+        "color": "#ff0000",
+        "fields": [
+          {
+            "short": true,
+            "title": "Test",
+            "value": "Testing out something or other"
+          },
+          {
+            "short": true,
+            "title": "Another Test",
+            "value": "[Link](https://google.com/) something and this and that."
+          }
+        ],
+        "image_url": "http://res.guggy.com/logo_128.png",
+        "message_link": "https://google.com",
+        "text": "Yay for gruggy!",
+        "thumb_url": "http://res.guggy.com/logo_128.png",
+        "title": "Attachment Example",
+        "title_link": "https://youtube.com",
+        "title_link_download": true,
+        "ts": "2016-12-09T16:53:06.761Z",
+        "video_url": "http://www.w3schools.com/tags/movie.mp4"
+      }
+    ]
   }
+},
+  output: {
+  "successStatus": "200",
+  "description": "OK",
+  "responseSchema": {
+    "type": "object",
+    "properties": {
+      "ts": {
+        "type": "integer"
+      },
+      "channel": {
+        "type": "string"
+      },
+      "message": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "parseUrls": {
+            "type": "boolean"
+          },
+          "groupable": {
+            "type": "boolean"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "u": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            }
+          },
+          "rid": {
+            "type": "string"
+          },
+          "_updatedAt": {
+            "type": "string"
+          },
+          "_id": {
+            "type": "string"
+          }
+        }
+      },
+      "success": {
+        "type": "boolean"
+      }
+    }
+  },
+  "outputFields": [
+    {
+      "name": "ts",
+      "path": "ts",
+      "type": "integer",
+      "description": ""
+    },
+    {
+      "name": "channel",
+      "path": "channel",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "message",
+      "path": "message",
+      "type": "object",
+      "description": ""
+    },
+    {
+      "name": "alias",
+      "path": "message.alias",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "msg",
+      "path": "message.msg",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "parseUrls",
+      "path": "message.parseUrls",
+      "type": "boolean",
+      "description": ""
+    },
+    {
+      "name": "groupable",
+      "path": "message.groupable",
+      "type": "boolean",
+      "description": ""
+    },
+    {
+      "name": "ts",
+      "path": "message.ts",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "u",
+      "path": "message.u",
+      "type": "object",
+      "description": ""
+    },
+    {
+      "name": "_id",
+      "path": "message.u._id",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "username",
+      "path": "message.u.username",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "rid",
+      "path": "message.rid",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "_updatedAt",
+      "path": "message._updatedAt",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "_id",
+      "path": "message._id",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "name": "success",
+      "path": "success",
+      "type": "boolean",
+      "description": ""
+    }
+  ]
 },
 };
 
 export async function post_api_v1_chat_postmessage(args = {}, context = {}) {
-  const {
-    baseUrl = process.env.BASE_URL,
-    pathParams = {},
-    query = {},
-    headers = {},
-    body,
-    signal,
-  } = context;
-
-  const resolvedBaseUrl = resolveBaseUrl(baseUrl);
-  const resolvedPath = interpolatePath(ROUTE_PATH, pathParams);
-  const queryString = encodeQuery(query);
-  const url = queryString
-    ? `${resolvedBaseUrl}${resolvedPath}?${queryString}`
-    : `${resolvedBaseUrl}${resolvedPath}`;
-
-  const requestHeaders = {
-    Accept: "application/json",
-    ...headers,
-  };
-
-  const request = {
+  return executeToolRequest({
+    toolKey: TOOL_KEY,
     method: METHOD,
-    headers: requestHeaders,
-    signal,
-  };
-
-  if (METHOD !== "GET" && METHOD !== "HEAD") {
-    const payload = body === undefined ? args : body;
-    if (payload !== undefined) {
-      request.headers["Content-Type"] = "application/json";
-      request.body = JSON.stringify(payload);
-    }
-  }
-
-  const response = await fetch(url, request);
-  const text = await response.text();
-  let parsed;
-
-  if (text.length > 0) {
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      parsed = text;
-    }
-  }
-
-  if (!response.ok) {
-    const reason = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-    throw new Error(`HTTP ${response.status} ${response.statusText} for ${TOOL_KEY}: ${reason}`);
-  }
-
-  return parsed;
+    routePath: ROUTE_PATH,
+    args,
+    context,
+  });
 }
 
 export default post_api_v1_chat_postmessage;
