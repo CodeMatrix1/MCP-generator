@@ -1,0 +1,87 @@
+{{#if hasLLMSteps}}
+import { runGeminiPrompt } from "../../core/llm/geminiCli.js";
+{{/if}}
+{{#if toolImports}}
+import { {{toolImports}} } from "../index.js";
+{{/if}}
+
+export const workflow = {{{workflowLiteral}}};
+
+export const meta = {
+  key: workflow.key,
+  label: workflow.label,
+  description: workflow.description,
+  scope: workflow.scope || "serve-only",
+  inputSchema: workflow.inputSchema || null,
+};
+
+function getValueByPath(source, pathExpression) {
+  const normalizedPath = String(pathExpression || "")
+    .replace(/\[\]/g, ".0")
+    .replace(/\[(\d+)\]/g, ".$1")
+    .replace(/^\.+|\.+$/g, "");
+
+  if (!normalizedPath) return source;
+
+  return normalizedPath.split(".").reduce((value, segment) => {
+    if (value === null || value === undefined) return undefined;
+    return value[segment];
+  }, source);
+}
+
+export async function {{functionName}}({
+{{#each inputProps}}
+  {{this}},
+{{/each}}
+}, runtime = {}) {
+  try {
+{{#each conditionViews}}
+    const {{varName}} = String(await runGeminiPrompt({{{promptLiteral}}})).trim().toUpperCase() === "TRUE";
+{{/each}}
+{{#each steps}}
+    // =========================================================
+    // STEP {{number}}: {{description}}
+    // =========================================================
+  {{#if hasCondition}}
+    if ({{{conditionCode}}}) {
+  {{#if (eq kind "runtime_tool")}}
+    {{> runtime_tool_step}}
+  {{else if (eq kind "compute_step")}}
+    {{> compute_step}}
+  {{else if (eq kind "condition_step")}}
+    {{> condition_step}}
+  {{else}}
+    {{> llm_step}}
+  {{/if}}
+    }
+  {{else}}
+  {{#if (eq kind "runtime_tool")}}
+    {{> runtime_tool_step}}
+  {{else if (eq kind "compute_step")}}
+    {{> compute_step}}
+  {{else if (eq kind "condition_step")}}
+    {{> condition_step}}
+  {{else}}
+    {{> llm_step}}
+  {{/if}}
+  {{/if}}
+{{/each}}
+    return {
+      status: "ok",
+      result: {
+{{#each outputVarNames}}
+        {{this}},
+{{/each}}
+      },
+    };
+  } catch (err) {
+    return {
+      status: "error",
+      error: err && err.message ? err.message : String(err || "Unknown error"),
+    };
+  }
+}
+
+export default async function executeGeneratedWorkflow(input = {}, runtime = {}) {
+  return {{functionName}}(input, runtime);
+}

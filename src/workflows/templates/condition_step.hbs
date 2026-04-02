@@ -1,0 +1,6 @@
+// {{key}} (condition_step)
+// promptTemplate is emitted as a codegen-time template and may still contain placeholders to be filled later.
+const step_{{key}} = await runGeminiPrompt({{promptLiteral}});
+{{#each outputAssignments}}
+{{this}}
+{{/each}}

@@ -1,0 +1,6 @@
+// {{key}} (llm_step)
+// promptTemplate is the final prompt text used for this LLM step.
+const step_{{key}} = await runGeminiPrompt({{promptLiteral}});
+{{#each outputAssignments}}
+{{this}}
+{{/each}}

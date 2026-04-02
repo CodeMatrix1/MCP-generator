@@ -1,0 +1,18 @@
+{
+  "query": "ensure user exists, ensure channel exists, add user to channel, generate a welcome message using an llm, then send the welcome message",
+  "intentConfirmation": {
+    "intent": "ensure user exists, ensure channel exists, add user to channel, generate a welcome message using an llm, then send the welcome message",
+    "inputs": [
+      "username",
+      "channel_name"
+    ]
+  },
+  "tokenUsage": {
+    "input": 1379,
+    "output": 0
+  },
+  "approvalRequired": true,
+  "resumeArgs": [
+    "--intent-confirmed"
+  ]
+}

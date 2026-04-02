@@ -1,0 +1,132 @@
+{
+  "steps": [
+    {
+      "key": "find_user",
+      "kind": "runtime_tool",
+      "endpointKey": "get-api-v1-users.info",
+      "inputs": [
+        { "name": "userId", "in": "query", "required": true }
+      ],
+      "outputs": {
+        "userId": "user._id",
+        "username": "user.username",
+        "success": "success"
+      },
+      "inputBindings": {
+        "userId": "workflow.username"
+      }
+    },
+    {
+      "key": "find_channel",
+      "kind": "runtime_tool",
+      "endpointKey": "get-api-v1-channels.info",
+      "inputs": [
+        { "name": "roomName", "in": "query", "required": true }
+      ],
+      "outputs": {
+        "channelId": "channel._id",
+        "channelName": "channel.name",
+        "success": "success"
+      },
+      "inputBindings": {
+        "roomName": "workflow.channel_name"
+      }
+    },
+    {
+      "key": "generate_welcome_message",
+      "kind": "llm_step",
+      "promptTemplate": "Generate a short welcome message for a new user named {{username}} joining the channel {{channel_name}}. Make it friendly and concise.",
+      "inputs": [
+        { "name": "username", "in": "virtual", "required": true },
+        { "name": "channel_name", "in": "virtual", "required": true }
+      ],
+      "outputs": {
+        "message_text": "message"
+      },
+      "inputBindings": {
+        "username": "workflow.username",
+        "channel_name": "workflow.channel_name"
+      }
+    },
+    {
+      "key": "create_user_if_missing",
+      "kind": "runtime_tool",
+      "dependsOn": ["find_user"],
+      "endpointKey": "post-api-v1-users.create",
+      "inputs": [
+        { "name": "name", "in": "body", "required": true },
+        { "name": "email", "in": "body", "required": true },
+        { "name": "password", "in": "body", "required": true },
+        { "name": "username", "in": "body", "required": true }
+      ],
+      "outputs": {
+        "userId": "user._id",
+        "username": "user.username",
+        "success": "success"
+      },
+      "inputBindings": {
+        "name": "workflow.username",
+        "email": "workflow.username + '@example.com'",
+        "password": "'generated_password'",
+        "username": "workflow.username"
+      }
+    },
+    {
+      "key": "create_channel_if_missing",
+      "kind": "runtime_tool",
+      "dependsOn": ["find_channel"],
+      "endpointKey": "post-api-v1-channels.create",
+      "inputs": [
+        { "name": "name", "in": "body", "required": true }
+      ],
+      "outputs": {
+        "channelId": "channel._id",
+        "channelName": "channel.name",
+        "success": "success"
+      },
+      "inputBindings": {
+        "name": "workflow.channel_name"
+      }
+    },
+    {
+      "key": "add_user_to_channel",
+      "kind": "runtime_tool",
+      "dependsOn": ["create_user_if_missing", "create_channel_if_missing"],
+      "endpointKey": "post-api-v1-channels.invite",
+      "inputs": [
+        { "name": "roomId", "in": "body", "required": true },
+        { "name": "userId", "in": "body", "required": true }
+      ],
+      "outputs": {
+        "channelId": "channel._id",
+        "success": "success"
+      },
+      "inputBindings": {
+        "roomId": "steps.find_channel.channelId ?? steps.create_channel_if_missing.channelId",
+        "userId": "steps.find_user.userId ?? steps.create_user_if_missing.userId"
+      }
+    },
+    {
+      "key": "send_welcome_message",
+      "kind": "runtime_tool",
+      "dependsOn": ["generate_welcome_message", "add_user_to_channel"],
+      "endpointKey": "post-api-v1-chat.postMessage",
+      "inputs": [
+        { "name": "roomId", "in": "body", "required": true },
+        { "name": "text", "in": "body", "required": true }
+      ],
+      "outputs": {
+        "messageId": "message._id",
+        "success": "success"
+      },
+      "inputBindings": {
+        "roomId": "steps.add_user_to_channel.channelId",
+        "text": "steps.generate_welcome_message.message_text"
+      }
+    }
+  ],
+  "notes": [
+    "X-Auth-Token and X-User-Id are assumed to be provided by the system context for all runtime_tool steps.",
+    "For create_user_if_missing, a dummy email and password are used as they are not available in the workflow input. This might need to be addressed if real user creation is intended."
+  ]
+}

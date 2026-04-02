@@ -1,0 +1,149 @@
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-engagement-dashboard-users-users-by-time-of-the-day-in-a-week
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-engagement-dashboard-users-users-by-time-of-the-day-in-a-week
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-engagement-dashboard-users-users-by-time-of-the-day-in-a-week
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-engagement-dashboard-users-users-by-time-of-the-day-in-a-week
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-engagement-dashboard-users-users-by-time-of-the-day-in-a-week
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-engagement-dashboard-users-users-by-time-of-the-day-in-a-week
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: post-api-v1-groups.create
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-livechat-message
+Loaded tool: get-api-v1-rooms.nameExists
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-groups.addAll
+Loaded tool: post-api-v1-groups.create
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Loaded tool: post-api-v1-users.create
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.sendMessage
+Runtime MCP Server failed to start: listen EPERM: operation not permitted 127.0.0.1:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server failed to start: listen EPERM: operation not permitted 127.0.0.1:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Loaded tool: post-api-v1-users.create
+Runtime MCP Server failed to start: listen EPERM: operation not permitted 127.0.0.1:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Loaded tool: post-api-v1-users.create
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Loaded tool: post-api-v1-users.create
+Runtime MCP Server running at http://localhost:4001
+Loaded tool: post-api-v1-chat.postMessage
+Loaded tool: get-api-v1-channels.info
+Loaded tool: post-api-v1-channels.create
+Loaded tool: post-api-v1-channels.invite
+Loaded tool: get-api-v1-users.list
+Loaded tool: post-api-v1-users.create
+Runtime MCP Server running at http://localhost:4001

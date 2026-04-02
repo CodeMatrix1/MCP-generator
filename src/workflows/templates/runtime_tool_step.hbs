@@ -1,0 +1,11 @@
+// {{key}} (runtime_tool)
+const step_{{key}}_context = runtime && typeof runtime.buildStepContext === "function"
+  ? runtime.buildStepContext({{{contextCode}}})
+  : {{{contextCode}}};
+const step_{{key}} = await {{toolFunction}}(
+  {{{argsCode}}},
+  step_{{key}}_context
+);
+{{#each outputAssignments}}
+{{this}}
+{{/each}}

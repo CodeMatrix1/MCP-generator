@@ -1,0 +1,6 @@
+Control MCP Server running at http://localhost:4002
+Control MCP Server failed to start: listen EPERM: operation not permitted 127.0.0.1:4002
+Control MCP Server failed to start: listen EPERM: operation not permitted 127.0.0.1:4002
+Control MCP Server failed to start: listen EPERM: operation not permitted 127.0.0.1:4002
+Control MCP Server failed to start: listen EPERM: operation not permitted 127.0.0.1:4102
+Control MCP Server running at http://localhost:4102
