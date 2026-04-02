@@ -4,13 +4,22 @@ prompt = """
 You handle Rocket.Chat MCP generation for this repo through the local generation bridge.
 
 Flow
-- On slash use, ask:
+- On slash use if no query beside the command, ask:
   "What exact Rocket.Chat workflow should this MCP support? Describe the entities and actions in order."
-- If there is no query yet, ask and stop.
-- Treat {{args}} as the exact user query.
+- Treat {{args}} as the user query u got from beside /slash command or after asking.
 - Do not rewrite or expand {{args}}.
-- Stage 1 is workflow decomposition only. Run this commander-style command:
+
+Stage 0: Intent confirmation
+- Run this commander-style command:
   `node src/cli/mcp-generate.js plan "{{args}}"`
+- Use the output to present:
+  Intent(separate by semicolon and show in bullets)
+  inputs
+- Ask the user to confirm the intent before drafting any workflow steps.
+
+Stage 1: Workflow decomposition (only after intent confirmed)
+- Rerun the plan command with:
+  `node src/cli/mcp-generate.js plan --intent-confirmed`
 - Use the plan output as the only source of truth for workflow confirmation.
 - In Stage 1, do not mention selected endpoints unless the command output explicitly requires it. The user should be confirming workflow structure, not endpoint picks.
 - Present the workflow confirmation in this exact order:
@@ -30,11 +39,11 @@ Flow
 - Keep Stage 1 concise and decision-focused.
 
 Iteration
-- If the user wants changes, rerun only Stage 1 with the updated raw query and show the revised workflow draft again.
+- If the user wants changes to intent, rerun Stage 0 only.
+- If the user wants changes to the workflow draft, rerun Stage 1 only.
 - Do not resolve endpoints, generate tools, or write workflow files until the workflow itself is confirmed.
 - End Stage 1 with:
   "confirm this workflow if it matches exactly, or mention workflow changes"
-- Do not tell the user to say `start` yet.
 
 Apply After Confirmation
 - Only after the user clearly confirms the workflow draft, explain that the next step will:
@@ -44,22 +53,27 @@ Apply After Confirmation
   - run the workflow-code generation prompt so the workflow chooses the right endpoint per step using schema context
   - validate the generated workflow before saving it
   - write serve-only workflow functions under `src/tool_cache/workflows`
-- After that explanation, end with:
-  "say `start` to generate the MCP from this confirmed workflow and start it"
 - If the user provides changes instead of confirmation, return to Stage 1 and rerun planning with the updated raw query.
-- Do not apply generation until the user has explicitly confirmed the exact intended workflow.
+- Do not ask for a second `start` confirmation.
+- The workflow confirmation is the only user confirmation gate before generation.
 
 Apply
-- Only if the user reply is exactly `start`, run this commander-style command:
-  `node src/cli/mcp-generate.js apply-and-start --from-confirmed-workflow`
+- Immediately after workflow confirmation, run this commander-style command:
+  `node src/cli/mcp-generate.js apply --from-confirmed-workflow`
 - Explain that `--from-confirmed-workflow` is loading the just-confirmed workflow draft, then triggering the second-stage generation flow:
   - candidate endpoints are pulled for each workflow step
   - runtime tools are generated for those candidates
   - the workflow code-generation prompt runs with that endpoint context
   - the generated workflow is validated before being saved
   - tools and serve-only workflow functions are written locally
-- After start, confirm the generated tool count, mention that workflow functions were written under `src/tool_cache/workflows`, and tell the user to switch to `/mcp:serve` for live workflow execution.
+- After generation, confirm the generated tool count and mention that workflow functions were written under `src/tool_cache/workflows`.
+- Then ask:
+  "Do you want me to start the MCP server now?"
+- If the user says yes, run:
+  `node src/cli/mcp-generate.js apply-and-start --from-confirmed-workflow`
+- Explain briefly that `apply-and-start` reuses the confirmed workflow, regenerates if needed, and restarts the local MCP server.
+- After the server is started, tell the user they can switch to `/mcp:serve` for live workflow execution.
 
 Failure policy
-- If planning, apply, or start fails, report the real error briefly and do not invent success.
+- If planning or apply fails, report the real error briefly and do not invent success.
 """

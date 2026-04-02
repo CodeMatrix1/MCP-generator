@@ -4,7 +4,6 @@ import {
   normalizeRefinedStep,
   normalizeWorkflow,
   rankCandidateEndpointsForStep,
-  refineWorkflowWithHeuristics,
 } from "./WorkflowNodeHelpers.js";
 
 export async function selectFinalEndpoints(state) {
@@ -19,7 +18,7 @@ export async function selectFinalEndpoints(state) {
   }
 
   const baseWorkflow = state.workflow || normalizeWorkflow(null, state.query);
-  const selectionWorkflow = refineWorkflowWithHeuristics(baseWorkflow, state.query);
+  const selectionWorkflow = baseWorkflow;
   const expandedCandidateIds = expandCandidateEndpointsFromWorkflow(
     selectionWorkflow,
     candidateIds,

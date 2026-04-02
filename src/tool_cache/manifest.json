@@ -1,16 +1,40 @@
 {
-  "generatedAt": "2026-03-26T13:14:15.304Z",
-  "totalRequested": 3,
-  "generatedCount": 3,
+  "generatedAt": "2026-04-02T19:11:52.737Z",
+  "totalRequested": 6,
+  "generatedCount": 6,
   "skippedCount": 0,
   "generated": [
     {
-      "endpoint": "get-api-v1-users.list",
+      "endpoint": "get-api-v1-users.info",
       "method": "GET",
-      "path": "/api/v1/users.list",
+      "path": "/api/v1/users.info",
       "category": "user_management",
-      "functionName": "get_api_v1_users_list",
-      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/user_management/get_api_v1_users_list.js"
+      "functionName": "get_api_v1_users_info",
+      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/user_management/get_api_v1_users_info.js"
+    },
+    {
+      "endpoint": "get-api-v1-channels.info",
+      "method": "GET",
+      "path": "/api/v1/channels.info",
+      "category": "rooms",
+      "functionName": "get_api_v1_channels_info",
+      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/rooms/get_api_v1_channels_info.js"
+    },
+    {
+      "endpoint": "post-api-v1-users.create",
+      "method": "POST",
+      "path": "/api/v1/users.create",
+      "category": "user_management",
+      "functionName": "post_api_v1_users_create",
+      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/user_management/post_api_v1_users_create.js"
+    },
+    {
+      "endpoint": "post-api-v1-channels.create",
+      "method": "POST",
+      "path": "/api/v1/channels.create",
+      "category": "rooms",
+      "functionName": "post_api_v1_channels_create",
+      "file": "/home/vallabh/github/MCP_Tryouts/RC_MCP_Synthesizer/src/tool_cache/rooms/post_api_v1_channels_create.js"
     },
     {
       "endpoint": "post-api-v1-channels.invite",

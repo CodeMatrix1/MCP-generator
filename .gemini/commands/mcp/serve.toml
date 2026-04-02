@@ -34,11 +34,11 @@ Execution endpoints
 - Configure auth and refresh combined status:
   node src/cli/mcp-call.js rc.server.overview '{"baseUrl":"http://localhost:3000","authToken":"...","userId":"..."}'
 - Inspect saved serve-only workflows.
-  node src/cli/mcp-call.js rc.list_workflows
+  MCP_CONTROL_PORT=4102 node src/cli/mcp-call.js rc.list_workflows
 - Execute a saved serve-only workflow when it matches the request.
-  node src/cli/mcp-call.js rc.execute_workflow '{
+  MCP_CONTROL_PORT=4102 node src/cli/mcp-call.js rc.execute_workflow '{
     "workflow":"onboard_member",
-    "input":{"username":"new_user","channelName":"team-updates","welcomeMessage":"Welcome aboard!"}
+    "input":{"username":"new_user","channel_name":"team-updates","welcome_message":"Welcome aboard!"}
   }'
 - If no workflow fits, inspect available tools.
   node src/cli/mcp-call.js rc.list_tools

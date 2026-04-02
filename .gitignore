@@ -4,3 +4,5 @@
 /Rocket.Chat-Open-API
 .vscode
 AGENTS.md
+# LangGraph API
+.langgraph_api

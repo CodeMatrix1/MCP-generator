@@ -146,6 +146,7 @@ function writeToolIndex(outputDir, generated) {
   });
 
   fs.writeFileSync(path.join(outputDir, "index.ts"), `${lines.join("\n")}\n`, "utf8");
+  fs.writeFileSync(path.join(outputDir, "index.js"), `${lines.join("\n")}\n`, "utf8");
 }
 
 export async function generateMcpTools(MCP_Endpoints = [], options = {}) {

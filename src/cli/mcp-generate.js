@@ -13,16 +13,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..", "..");
 
-async function runPlan(queryParts) {
+async function runPlan(queryParts, options = {}) {
   const query = queryParts.join(" ").trim();
-  if (!query) {
+  if (!query && !options.intentConfirmed) {
     throw new Error("Missing query for plan.");
   }
 
   resetLogFile();
+  const args = [
+    path.join(projectRoot, "src", "index.js"),
+    "--draft-only",
+    "--no-server",
+    "--json",
+  ];
+  if (query) {
+    args.splice(1, 0, "--query", query);
+  }
+  if (options.intentConfirmed) {
+    args.push("--intent-confirmed");
+  }
+
   const planOutput = execFileSync(
     process.execPath,
-    [path.join(projectRoot, "src", "index.js"), "--query", query, "--draft-only", "--no-server", "--json"],
+    args,
     {
       cwd: projectRoot,
       env: process.env,
@@ -41,6 +54,10 @@ function buildIndexArgs(queryParts, options = {}, extraArgs = []) {
   const args = options.fromConfirmedWorkflow
     ? ["--from-confirmed-workflow"]
     : ["--query", query];
+
+  if (options.intentConfirmed) {
+    args.push("--intent-confirmed");
+  }
 
   return [...args, ...extraArgs, "--json"];
 }
@@ -78,18 +95,21 @@ async function main() {
   program
     .command("plan")
     .argument("[query...]")
-    .action((queryParts) => runPlan(queryParts));
+    .option("--intent-confirmed", "Resume after intent confirmation")
+    .action((queryParts, options) => runPlan(queryParts, options));
 
   program
     .command("apply")
     .argument("[query...]")
     .option("--from-confirmed-workflow", "Reuse the confirmed workflow")
+    .option("--intent-confirmed", "Resume after intent confirmation")
     .action((queryParts, options) => runApply(queryParts, options));
 
   program
     .command("apply-and-start")
     .argument("[query...]")
     .option("--from-confirmed-workflow", "Reuse the confirmed workflow")
+    .option("--intent-confirmed", "Resume after intent confirmation")
     .action((queryParts, options) => runApplyAndStart(queryParts, options));
 
   await program.parseAsync(process.argv);

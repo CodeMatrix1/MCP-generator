@@ -5,8 +5,8 @@ import {
   generateWorkflowModuleSource,
   renderWorkflowModuleSource,
 } from "./WorkflowCodegen.js";
-import { buildExecutableWorkflowFallback } from "./WorkflowResolve.js";
-import { validateExecutableWorkflow } from "./WorkflowValidate.js";
+import { buildExecutableWorkflowFallback } from "./WorkflowMapEndpointsHelper.js";
+import { validateExecutableWorkflow } from "./WorkflowValidateHelper.js";
 
 function sanitizeToken(input, fallback = "workflow") {
   const value = String(input ?? "")
@@ -20,6 +20,20 @@ function sanitizeToken(input, fallback = "workflow") {
 
 export function getWorkflowDir(projectRoot = process.cwd()) {
   return path.join(projectRoot, "src", "tool_cache", "workflows");
+}
+
+function resolveWorkflowForWrite(entry) {
+  if (!entry || typeof entry !== "object") return entry;
+  if (entry.finalWorkflow && typeof entry.finalWorkflow === "object") {
+    return entry.finalWorkflow;
+  }
+  if (entry.refinedWorkflow && typeof entry.refinedWorkflow === "object") {
+    return entry.refinedWorkflow;
+  }
+  if (entry.workflow && typeof entry.workflow === "object" && entry.key === undefined) {
+    return entry.workflow;
+  }
+  return entry;
 }
 
 async function validateGeneratedModuleCode(code, targetPath, projectRoot, allowedTools = []) {
@@ -45,22 +59,43 @@ export async function writeWorkflowModules(
   workflows,
   projectRoot = process.cwd(),
   selectedEndpoints = [],
+  endpointSelections = [],
 ) {
   const workflowDir = getWorkflowDir(projectRoot);
   fs.mkdirSync(workflowDir, { recursive: true });
 
-  for (const workflow of workflows || []) {
+  const endpointSelectionMap = new Map(
+    (endpointSelections || [])
+      .filter((entry) => entry?.key && entry?.endpointKey)
+      .map((entry) => [entry.key, entry.endpointKey]),
+  );
+
+  for (const workflowEntry of workflows || []) {
+    const workflow = resolveWorkflowForWrite(workflowEntry);
+    if (!workflow?.key) continue;
     const fileName = `${sanitizeToken(workflow.key)}.js`;
     const targetPath = path.join(workflowDir, fileName);
-    const fallbackWorkflow = buildExecutableWorkflowFallback(workflow);
+    const workflowForRender = {
+      ...workflow,
+      steps: (workflow.steps || []).map((step) => {
+        if (step?.tool) return step;
+        const endpointKey = endpointSelectionMap.get(step.key) || String(step?.endpointKey || "").trim();
+        return endpointKey ? { ...step, tool: endpointKey } : step;
+      }),
+    };
+    const fallbackWorkflow = buildExecutableWorkflowFallback(workflowForRender);
+    const existingDraftCode = fs.existsSync(targetPath)
+      ? fs.readFileSync(targetPath, "utf8")
+      : "";
     const generatedCode = await generateWorkflowModuleSource(
-      workflow,
+      workflowForRender,
       selectedEndpoints,
       projectRoot,
+      existingDraftCode,
     );
     let finalCode = renderWorkflowModuleSource(fallbackWorkflow);
     const allowedTools = new Set(
-      (workflow.steps || [])
+      (workflowForRender.steps || [])
         .flatMap((step) => step.candidateEndpoints || [])
         .map((endpoint) => endpoint?.key)
         .filter(Boolean),

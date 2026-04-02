@@ -19,6 +19,7 @@ import {
   draftSelection,
   finalizeSelection,
 } from "./selection/service.js";
+import { confirmIntent } from "./selection/ConfirmIntent.js";
 import { getRuntimeHost, getRuntimePort } from "./config/ports.js";
 import { syncGeminiExtension } from "./config/geminiExtension.js";
 import { logger } from "./config/loggerConfig.js";
@@ -151,6 +152,10 @@ function parseArgs(argv) {
       "Stop after drafting the workflow and save it for approval",
     )
     .option(
+      "--intent-confirmed",
+      "Skip intent confirmation and continue the workflow graph",
+    )
+    .option(
       "--auto-approve",
       "Skip the draft approval prompt and continue automatically",
     )
@@ -178,6 +183,7 @@ function parseArgs(argv) {
     fromLastSelection: Boolean(options.fromLastSelection),
     fromConfirmedWorkflow: Boolean(options.fromConfirmedWorkflow),
     draftOnly: Boolean(options.draftOnly),
+    intentConfirmed: Boolean(options.intentConfirmed),
     autoApprove: Boolean(options.autoApprove),
     startServer: options.server,
     stopServer: Boolean(options.stopServer),
@@ -215,12 +221,24 @@ const formatEndpoints = (str) =>
     .join("\n");
 
 function summarizeWorkflowDraft(selectionSummary) {
-  return (selectionSummary?.workflows || [])
+  const clamp = (value, limit = 90) => {
+    const text = String(value || "").trim();
+    if (text.length <= limit) return text;
+    return `${text.slice(0, limit - 1).trim()}…`;
+  };
+
+  const refined = selectionSummary?.refinedWorkflow && typeof selectionSummary.refinedWorkflow === "object"
+    ? [selectionSummary.refinedWorkflow]
+    : [];
+  const workflows = refined.length > 0 ? refined : (selectionSummary?.workflows || []);
+
+  return workflows
     .map((workflow, workflowIndex) => {
       const steps = (workflow?.steps || [])
-        .map((step, index) => `  ${index + 1}. ${step.key} [${step.kind || "runtime_tool"}] ${step.description}`)
+        .map((step, index) => `  ${index + 1}. ${step.key} — ${clamp(step.description || step.purpose || "")}`)
         .join("\n");
-      return `Workflow ${workflowIndex + 1}: ${workflow?.label || workflow?.key || "Workflow"}\n${steps}`;
+      const label = workflow?.label || workflow?.key || "Workflow";
+      return `Workflow ${workflowIndex + 1}: ${label}\n${steps}`;
     })
     .join("\n\n");
 }
@@ -290,30 +308,93 @@ async function main() {
     selectionSummary = lastSelection;
   } else if (args.fromConfirmedWorkflow) {
     const confirmedWorkflow = loadConfirmedWorkflow();
-    const selection = await finalizeSelection(confirmedWorkflow);
+    let selection;
+    try {
+      selection = await finalizeSelection(confirmedWorkflow);
+    } catch (err) {
+      if (err?.selection) {
+        saveConfirmedWorkflow(err.selection);
+      }
+      throw err;
+    }
+    saveConfirmedWorkflow(selection);
     selectionSummary = await generateFromSelection(selection);
     selectedEndpoints = selectionSummary.selectedEndpoints || [];
   } else {
     const userQuery = String(args.query || "").trim();
-    if (!userQuery) {
+    if (!userQuery && args.intentConfirmed) {
+      const confirmedWorkflow = loadConfirmedWorkflow();
+      args.query = String(confirmedWorkflow?.query || "").trim();
+      if (!args.query) {
+        throw new Error("No saved query found for --intent-confirmed.");
+      }
+    }
+
+    if (!String(args.query || "").trim()) {
       const rl = readline.createInterface({ input, output });
       const answer = await rl.question("What Rocket.Chat MCP do you want to generate? ");
       rl.close();
       args.query = answer.trim();
     }
 
-    const draft = await draftSelection(args.query);
-    saveConfirmedWorkflow(draft);
+    if (args.draftOnly && !args.intentConfirmed) {
+      const intentResult = await confirmIntent(args.query);
+      let intentConfirmation = {};
+      try {
+        intentConfirmation = JSON.parse(intentResult?.gemini || "{}");
+      } catch {
+        intentConfirmation = {};
+      }
+
+      const intentPayload = {
+        query: args.query,
+        intentConfirmation,
+        tokenUsage: { input: intentResult?.tokenMetrics || 0, output: 0 },
+        approvalRequired: true,
+        resumeArgs: ["--intent-confirmed"],
+      };
+      saveConfirmedWorkflow(intentPayload);
+
+      if (args.json) {
+        logger.info(JSON.stringify(intentPayload, null, 2));
+        return;
+      }
+
+      logger.info("Intent confirmation required before drafting.");
+      logger.info(JSON.stringify(intentConfirmation, null, 2));
+      logger.info("Rerun with --intent-confirmed to continue.");
+      return;
+    }
+
+    const resumedIntentConfirmation = args.intentConfirmed
+      ? (() => {
+          try {
+            return loadConfirmedWorkflow()?.intentConfirmation || {};
+          } catch {
+            return {};
+          }
+        })()
+      : {};
+
+    const draft = await draftSelection(args.query, {
+      intentConfirmed: args.intentConfirmed || args.autoApprove,
+      intentConfirmation: resumedIntentConfirmation,
+    });
+    if (!draft.intentOnly) {
+      saveConfirmedWorkflow(draft);
+    }
 
     if (args.draftOnly) {
       const draftPayload = {
         query: draft.query,
+        intentConfirmation: draft.intentConfirmation || {},
         candidateEndpoints: draft.candidateEndpoints || [],
         selectedEndpoints: draft.selectedEndpoints || [],
         tokenUsage: draft.tokenUsage || { input: 0, output: 0 },
         draftWorkflow: draft.draftWorkflow || null,
         refinedWorkflow: draft.refinedWorkflow || null,
         finalWorkflow: draft.finalWorkflow || null,
+        mappedWorkflow: draft.mappedWorkflow || null,
         workflows: draft.workflows || [],
         approvalRequired: true,
         resumeArgs: ["--from-confirmed-workflow", "--no-server"],
@@ -344,7 +425,20 @@ async function main() {
       return;
     }
 
-    const selection = await finalizeSelection(draft);
+    let selection;
+    try {
+      selection = await finalizeSelection(draft);
+    } catch (err) {
+      if (err?.selection) {
+        saveConfirmedWorkflow(err.selection);
+        if (args.json) {
+          logger.info(JSON.stringify(err.selection, null, 2));
+          return;
+        }
+      }
+      throw err;
+    }
+
     selectionSummary = await generateFromSelection(selection);
     selectedEndpoints = selectionSummary.selectedEndpoints || [];
   }
@@ -375,7 +469,10 @@ async function main() {
     tokenUsage: selectionSummary.tokenUsage || { input: 0, output: 0 },
     draftWorkflow: selectionSummary.draftWorkflow || null,
     refinedWorkflow: selectionSummary.refinedWorkflow || null,
+    validatedWorkflow: selectionSummary.validatedWorkflow || null,
     finalWorkflow: selectionSummary.finalWorkflow || null,
+    mappedWorkflow: selectionSummary.mappedWorkflow || null,
+    mappedSteps: selectionSummary.mappedSteps || [],
     generation: selectionSummary.generation,
     workflows: selectionSummary.workflows || [],
     server: getServerStatus(),

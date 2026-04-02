@@ -1,7 +1,7 @@
-import { TagsToEndpoints } from "../selection/lib/TagsToEndpoints.js";
+import { IntentToEndpoints } from "../selection/IntentToCandEndpoints.js";
 
 export async function retrieveCandidates(state) {
-  const { relevant_endpoints } = TagsToEndpoints(state.parsedDomain || {});
+  const { relevant_endpoints } = IntentToEndpoints(state.parsedDomain || {});
   return {
     currentNode: "retrieve_candidates",
     candidateEndpoints: Array.from(relevant_endpoints),

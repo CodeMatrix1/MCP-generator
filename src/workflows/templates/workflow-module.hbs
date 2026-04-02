@@ -25,35 +25,6 @@ function getValueByPath(source, pathExpression) {
   }, source);
 }
 
-function resolveTemplateValue(template, state) {
-  if (Array.isArray(template)) {
-    return template.map((entry) => resolveTemplateValue(entry, state));
-  }
-
-  if (template && typeof template === "object") {
-    return Object.fromEntries(
-      Object.entries(template).map(([key, value]) => [
-        key,
-        resolveTemplateValue(value, state),
-      ]),
-    );
-  }
-
-  if (typeof template !== "string") {
-    return template;
-  }
-
-  const exactMatch = template.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
-  if (exactMatch) {
-    return getValueByPath(state, exactMatch[1]);
-  }
-
-  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, expression) => {
-    const value = getValueByPath(state, expression);
-    return value === undefined || value === null ? "" : String(value);
-  });
-}
-
 function applyInputDefaults(schema, input = {}) {
   const result = { ...(input || {}) };
   const properties = schema?.properties && typeof schema.properties === "object"
@@ -122,6 +93,30 @@ function buildLocalSummary(value) {
   return String(value || "").slice(0, 500);
 }
 
+function runComputeStep(expression, state) {
+  if (typeof expression !== "string") return expression;
+  const trimmed = expression.trim();
+  if (!trimmed) return trimmed;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
+function conditionsMet(conditions = [], flags = {}) {
+  if (!Array.isArray(conditions) || conditions.length === 0) return true;
+  return conditions.every((condition) => {
+    const raw = String(condition || "").trim();
+    if (!raw) return true;
+    if (raw.startsWith("!")) {
+      const key = raw.slice(1);
+      return !Boolean(flags?.[key]);
+    }
+    return Boolean(flags?.[raw]);
+  });
+}
+
 async function invokeGeneratedLlmStep(step, state, helpers = {}) {
   if (typeof helpers.invokeLlmWorkflowStep === "function") {
     return helpers.invokeLlmWorkflowStep(step, state);
@@ -131,16 +126,7 @@ async function invokeGeneratedLlmStep(step, state, helpers = {}) {
   const fallbackSource = dependsOnKey
     ? state.steps[dependsOnKey]?.result
     : [...Object.values(state.steps)].at(-1)?.result;
-  const fallbackInputReference = dependsOnKey
-    ? ("{" + "{steps." + dependsOnKey + ".result}" + "}")
-    : ("{" + "{inputs}" + "}");
-  const prompt = String(
-    resolveTemplateValue(
-      step?.promptTemplate ||
-        `Complete this workflow step: ${step?.action || "llm_step"}\nDescription: ${step?.description || ""}\nInput:\n${fallbackInputReference}`,
-      state,
-    ) || "",
-  ).trim();
+  const prompt = String(step?.promptTemplate || "").trim();
 
   if (!prompt) {
     return {
@@ -172,55 +158,60 @@ export default async function executeGeneratedWorkflow(input = {}, helpers = {})
   const state = {
     inputs: resolvedInput,
     steps: {},
+    flags: {},
   };
   const steps = [];
 
 {{#each steps}}
   // Step {{number}}: {{description}}
   // Purpose: {{purpose}}
-{{#if isRuntime}}
-  const {{argsVar}} = resolveTemplateValue({{{argsLiteral}}}, state);
-  const {{contextInputVar}} = resolveTemplateValue({{{contextLiteral}}}, state);
-  const {{contextVar}} = buildStepContext(helpers, {{contextInputVar}});
-  try {
-    const {{resultVar}} = await helpers.invokeRuntimeTool({{{toolLiteral}}}, {{argsVar}}, {{contextVar}});
-    assertRequiredResultPaths({{{requiredResultPathsLiteral}}}, {{resultVar}}, {{{stepKeyLiteral}}});
+{{#if (eq kind "runtime_tool")}}
+  if (!conditionsMet({{{conditionLiteral}}}, state.flags)) {
     state.steps[{{{stepKeyLiteral}}}] = {
       key: {{{stepKeyLiteral}}},
       tool: {{{toolLiteral}}},
-      args: {{argsVar}},
-      context: {{contextVar}},
-      status: "ok",
-      result: {{resultVar}},
+      status: "skipped",
+      condition: {{{conditionLiteral}}},
     };
     steps.push(state.steps[{{{stepKeyLiteral}}}]);
-  } catch (error) {
+  } else {
+  {{> runtime_tool_step}}
+  }
+{{else if (eq kind "compute_step")}}
+  if (!conditionsMet({{{conditionLiteral}}}, state.flags)) {
     state.steps[{{{stepKeyLiteral}}}] = {
       key: {{{stepKeyLiteral}}},
-      tool: {{{toolLiteral}}},
-      args: {{argsVar}},
-      context: {{contextVar}},
-      status: {{continueOnErrorLiteral}} ? "ignored_error" : "error",
-      error: error instanceof Error ? error.message : String(error || "Workflow step failed."),
+      kind: "compute_step",
+      status: "skipped",
+      condition: {{{conditionLiteral}}},
     };
     steps.push(state.steps[{{{stepKeyLiteral}}}]);
-    if (!{{continueOnErrorLiteral}}) {
-      return buildFailure({{{stepKeyLiteral}}}, error);
-    }
+  } else {
+  {{> compute_step}}
+  }
+{{else if (eq kind "condition_step")}}
+  if (!conditionsMet({{{conditionLiteral}}}, state.flags)) {
+    state.steps[{{{stepKeyLiteral}}}] = {
+      key: {{{stepKeyLiteral}}},
+      kind: "condition_step",
+      status: "skipped",
+      condition: {{{conditionLiteral}}},
+    };
+    steps.push(state.steps[{{{stepKeyLiteral}}}]);
+  } else {
+  {{> condition_step}}
   }
 {{else}}
-  try {
-    const {{resultVar}} = await invokeGeneratedLlmStep({{{llmStepLiteral}}}, state, helpers);
+  if (!conditionsMet({{{conditionLiteral}}}, state.flags)) {
     state.steps[{{{stepKeyLiteral}}}] = {
       key: {{{stepKeyLiteral}}},
-      action: {{{actionLiteral}}},
       kind: "llm_step",
-      status: "ok",
-      result: {{resultVar}},
+      status: "skipped",
+      condition: {{{conditionLiteral}}},
     };
     steps.push(state.steps[{{{stepKeyLiteral}}}]);
-  } catch (error) {
-    return buildFailure({{{stepKeyLiteral}}}, error);
+  } else {
+  {{> llm_step}}
   }
 {{/if}}
 

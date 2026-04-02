@@ -6,12 +6,8 @@ import { writeWorkflowModules } from "../workflows/store.js";
 import {
   collectCandidateEndpointKeys,
   resolveWorkflowCandidatesWithLlm,
-} from "../workflows/WorkflowResolve.js";
-import {
-  createWorkflowFromEndpoints,
-  fallbackWorkflowDecomposition,
-  fallbackWorkflowDecompositionFromEndpoints,
-} from "../workflows/WorkflowSelect.js";
+} from "../workflows/WorkflowMapEndpointsHelper.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,21 +94,45 @@ export function loadConfirmedWorkflow() {
 
 function buildSelectionPayload(selection, generation = null) {
   const query = String(selection?.query || "").trim();
-  const workflowDefinitions = Array.isArray(selection?.workflows)
-    ? selection.workflows
-    : (query
-        ? fallbackWorkflowDecomposition(query)
-        : fallbackWorkflowDecompositionFromEndpoints(selection?.selectedEndpoints || []));
+  const preferredWorkflowDefinitions = selection?.validatedWorkflow
+    ? [selection.validatedWorkflow]
+    : selection?.finalWorkflow
+      ? [selection.finalWorkflow]
+    : selection?.refinedWorkflow
+      ? [selection.refinedWorkflow]
+      : null;
+  const workflowDefinitions = Array.isArray(preferredWorkflowDefinitions) && preferredWorkflowDefinitions.length > 0
+    ? preferredWorkflowDefinitions
+    : Array.isArray(selection?.workflows)
   const explicitSelectedEndpoints = Array.isArray(selection?.selectedEndpoints)
     ? selection.selectedEndpoints.filter(Boolean)
     : [];
   const normalizedWorkflowDefinitions =
-    workflowDefinitions.length > 0
-      ? workflowDefinitions
-      : createWorkflowFromEndpoints(explicitSelectedEndpoints, query);
+    workflowDefinitions
   const selectedEndpoints = explicitSelectedEndpoints.length > 0
     ? explicitSelectedEndpoints
     : collectEndpointsFromWorkflows(normalizedWorkflowDefinitions);
+  const promotedFinalWorkflow = selection?.validatedWorkflow
+    || selection?.finalWorkflow
+    || selection?.refinedWorkflow
+    || normalizedWorkflowDefinitions[0]
+    || null;
+  const compactMappedWorkflow = selection?.mappedWorkflow
+    ? {
+        key: selection.mappedWorkflow?.key || "",
+        description: selection.mappedWorkflow?.description || "",
+        steps: Array.isArray(selection.mappedWorkflow?.steps)
+          ? selection.mappedWorkflow.steps.map((step) => ({
+              key: step.key,
+              description: step.description || "",
+              ...(step.operationId ? { operationId: step.operationId } : {}),
+              ...(Array.isArray(step.candidateEndpoints) && step.candidateEndpoints.length > 0
+                ? { candidateEndpoints: step.candidateEndpoints }
+                : {}),
+            }))
+          : [],
+      }
+    : null;
 
   const payload = {
     query,
@@ -120,7 +140,10 @@ function buildSelectionPayload(selection, generation = null) {
     tokenUsage: selection?.tokenUsage || { input: 0, output: 0 },
     draftWorkflow: selection?.draftWorkflow || null,
     refinedWorkflow: selection?.refinedWorkflow || null,
-    finalWorkflow: selection?.finalWorkflow || null,
+    validatedWorkflow: selection?.validatedWorkflow || null,
+    finalWorkflow: promotedFinalWorkflow,
+    mappedWorkflow: compactMappedWorkflow,
+    mappedSteps: Array.isArray(selection?.mappedSteps) ? selection.mappedSteps : [],
     workflows: normalizedWorkflowDefinitions,
   };
 
@@ -158,10 +181,29 @@ export async function generateFromSelection(selection, options = {}) {
   clearToolCache();
 
   const generation = await generateMcpTools(selectedEndpoints, options);
+  const workflowsForCodegen = payloadBase.finalWorkflow
+    ? [payloadBase.finalWorkflow]
+    : candidateWorkflows;
+  let endpointSelections = Array.isArray(selection?.endpointSelections)
+    ? selection.endpointSelections
+    : Array.isArray(payloadBase.endpointSelections)
+      ? payloadBase.endpointSelections
+      : [];
+  if (endpointSelections.length === 0) {
+    endpointSelections = (candidateWorkflows || []).flatMap((workflow) =>
+      (workflow.steps || []).map((step) => ({
+        key: step.key,
+        kind: step.kind || "runtime_tool",
+        endpointKey: String(step?.endpointKey || step?.candidateEndpoints?.[0]?.key || "").trim(),
+        candidateEndpoints: Array.isArray(step?.candidateEndpoints) ? step.candidateEndpoints : [],
+      })),
+    );
+  }
   await writeWorkflowModules(
-    candidateWorkflows,
+    workflowsForCodegen,
     projectRoot,
     selectedEndpoints,
+    endpointSelections,
   );
   const payload = buildSelectionPayload(
     {
@@ -170,8 +212,11 @@ export async function generateFromSelection(selection, options = {}) {
       tokenUsage: payloadBase.tokenUsage,
       draftWorkflow: selection?.draftWorkflow || payloadBase.draftWorkflow || null,
       refinedWorkflow: selection?.refinedWorkflow || payloadBase.refinedWorkflow || null,
-      finalWorkflow: selection?.finalWorkflow || payloadBase.finalWorkflow || null,
-      workflows: candidateWorkflows,
+      validatedWorkflow: selection?.validatedWorkflow || payloadBase.validatedWorkflow || null,
+      finalWorkflow: payloadBase.finalWorkflow || null,
+      mappedWorkflow: selection?.mappedWorkflow || payloadBase.mappedWorkflow || null,
+      endpointSelections,
+      workflows: workflowsForCodegen,
     },
     generation,
   );

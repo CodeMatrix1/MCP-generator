@@ -785,10 +785,17 @@ function registerBuiltinTools() {
             "authToken and userId are required when configuring via rc.server.overview.",
           );
         }
-        saveAuthState({ baseUrl, authToken, userId });
+        const currentAuthState = readJsonFile(AUTH_STATE_PATH, {});
+        const resolvedBaseUrl =
+          baseUrl ||
+          currentAuthState.baseUrl ||
+          process.env.ROCKETCHAT_BASE_URL ||
+          process.env.BASE_URL ||
+          "";
+        saveAuthState({ baseUrl: resolvedBaseUrl, authToken, userId });
         authConfigured = {
           configured: true,
-          hasBaseUrl: Boolean(baseUrl),
+          hasBaseUrl: Boolean(resolvedBaseUrl),
           hasAuthToken: true,
           hasUserId: true,
         };
