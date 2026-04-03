@@ -49,9 +49,13 @@ export async function reviewDraft(state) {
     const seenKeys = new Set();
     for (const step of workflow.steps) {
       const key = String(step?.key || "").trim();
+      const kind = String(step?.kind || "").trim();
       if (!key) {
         errors.push("A workflow step is missing a key.");
         continue;
+      }
+      if (!kind) {
+        errors.push(`Workflow step "${key}" is missing kind.`);
       }
       if (seenKeys.has(key)) {
         errors.push(`Duplicate step key detected: ${key}`);

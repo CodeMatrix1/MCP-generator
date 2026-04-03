@@ -217,68 +217,240 @@
         }
       }
     },
+    "conditions": [
+      {
+        "key": "user_not_found",
+        "description": "True if the user was not found by the 'find_user' step.",
+        "promptTemplate": "Return TRUE if find_user.user_id is null or undefined, otherwise FALSE.",
+        "dependsOn": [
+          "find_user"
+        ]
+      },
+      {
+        "key": "channel_not_found",
+        "description": "True if the channel was not found by the 'find_channel' step.",
+        "promptTemplate": "Return TRUE if find_channel.channel_id is null or undefined, otherwise FALSE.",
+        "dependsOn": [
+          "find_channel"
+        ]
+      }
+    ],
     "steps": [
       {
         "key": "find_user",
         "description": "Finds an existing user by their username.",
         "kind": "runtime_tool",
+        "purpose": "Finds an existing user by their username.",
         "endpointKey": "get-api-v1-users.info",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "user_id": "user._id",
+          "username": "user.username"
+        },
+        "inputBindings": {
+          "userId": "inputs.username"
+        }
       },
       {
         "key": "find_channel",
         "description": "Finds an existing channel by its name.",
         "kind": "runtime_tool",
+        "purpose": "Finds an existing channel by its name.",
         "endpointKey": "get-api-v1-channels.info",
-        "inputs": []
-      },
-      {
-        "key": "generate_welcome_message",
-        "description": "Generates the content of the welcome message using an LLM.",
-        "kind": "runtime_tool",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomName",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id",
+          "channel_name": "channel.name"
+        },
+        "inputBindings": {
+          "roomName": "inputs.channel_name"
+        }
       },
       {
         "key": "create_user_if_missing",
         "description": "Creates a new user if the user was not found by the 'find_user' step.",
         "kind": "runtime_tool",
+        "purpose": "Creates a new user if the user was not found by the 'find_user' step.",
         "dependsOn": [
           "find_user"
         ],
+        "condition": "user_not_found",
         "endpointKey": "post-api-v1-users.create",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "name",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "email",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "password",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "username",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "user_id": "user._id",
+          "username": "user.username"
+        },
+        "inputBindings": {
+          "name": "inputs.username",
+          "email": "inputs.username + '@example.com'",
+          "password": "'generated_password_for_new_user'",
+          "username": "inputs.username"
+        }
       },
       {
         "key": "create_channel_if_missing",
         "description": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
         "kind": "runtime_tool",
+        "purpose": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
         "dependsOn": [
           "find_channel"
         ],
+        "condition": "channel_not_found",
         "endpointKey": "post-api-v1-channels.create",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "name",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id",
+          "channel_name": "channel.name"
+        },
+        "inputBindings": {
+          "name": "inputs.channel_name"
+        }
+      },
+      {
+        "key": "generate_welcome_message",
+        "description": "Generates the content of the welcome message using an LLM.",
+        "kind": "llm_step",
+        "purpose": "Generates the content of the welcome message using an LLM.",
+        "promptTemplate": "Generate a welcome message for user {{username}} joining channel {{channel_name}}. Keep it concise and friendly.",
+        "dependsOn": [
+          "find_user",
+          "find_channel",
+          "create_user_if_missing",
+          "create_channel_if_missing"
+        ],
+        "inputs": [
+          {
+            "name": "username",
+            "in": "virtual",
+            "required": true
+          },
+          {
+            "name": "channel_name",
+            "in": "virtual",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "message_text": "message"
+        },
+        "inputBindings": {
+          "username": "inputs.username",
+          "channel_name": "inputs.channel_name"
+        }
       },
       {
         "key": "add_user_to_channel",
         "description": "Adds the user (found or created) to the channel (found or created).",
         "kind": "runtime_tool",
+        "purpose": "Adds the user (found or created) to the channel (found or created).",
         "dependsOn": [
+          "find_user",
+          "find_channel",
           "create_user_if_missing",
           "create_channel_if_missing"
         ],
         "endpointKey": "post-api-v1-channels.invite",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "userId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "userIds",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id"
+        },
+        "inputBindings": {
+          "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+          "userId": "find_user.user_id ?? create_user_if_missing.user_id",
+          "userIds": "[find_user.user_id ?? create_user_if_missing.user_id]"
+        }
       },
       {
         "key": "send_welcome_message",
         "description": "Sends the generated welcome message to the specified channel.",
         "kind": "runtime_tool",
+        "purpose": "Sends the generated welcome message to the specified channel.",
         "dependsOn": [
           "generate_welcome_message",
           "add_user_to_channel"
         ],
         "endpointKey": "post-api-v1-chat.postMessage",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "text",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "channel",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "message_id": "message._id"
+        },
+        "inputBindings": {
+          "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+          "text": "generate_welcome_message.message_text",
+          "channel": "find_channel.channel_name ?? create_channel_if_missing.channel_name"
+        }
       }
     ]
   },
@@ -306,68 +478,240 @@
         }
       }
     },
+    "conditions": [
+      {
+        "key": "user_not_found",
+        "description": "True if the user was not found by the 'find_user' step.",
+        "promptTemplate": "Return TRUE if find_user.user_id is null or undefined, otherwise FALSE.",
+        "dependsOn": [
+          "find_user"
+        ]
+      },
+      {
+        "key": "channel_not_found",
+        "description": "True if the channel was not found by the 'find_channel' step.",
+        "promptTemplate": "Return TRUE if find_channel.channel_id is null or undefined, otherwise FALSE.",
+        "dependsOn": [
+          "find_channel"
+        ]
+      }
+    ],
     "steps": [
       {
         "key": "find_user",
         "description": "Finds an existing user by their username.",
         "kind": "runtime_tool",
+        "purpose": "Finds an existing user by their username.",
         "endpointKey": "get-api-v1-users.info",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "user_id": "user._id",
+          "username": "user.username"
+        },
+        "inputBindings": {
+          "userId": "inputs.username"
+        }
       },
       {
         "key": "find_channel",
         "description": "Finds an existing channel by its name.",
         "kind": "runtime_tool",
+        "purpose": "Finds an existing channel by its name.",
         "endpointKey": "get-api-v1-channels.info",
-        "inputs": []
-      },
-      {
-        "key": "generate_welcome_message",
-        "description": "Generates the content of the welcome message using an LLM.",
-        "kind": "runtime_tool",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomName",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id",
+          "channel_name": "channel.name"
+        },
+        "inputBindings": {
+          "roomName": "inputs.channel_name"
+        }
       },
       {
         "key": "create_user_if_missing",
         "description": "Creates a new user if the user was not found by the 'find_user' step.",
         "kind": "runtime_tool",
+        "purpose": "Creates a new user if the user was not found by the 'find_user' step.",
         "dependsOn": [
           "find_user"
         ],
+        "condition": "user_not_found",
         "endpointKey": "post-api-v1-users.create",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "name",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "email",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "password",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "username",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "user_id": "user._id",
+          "username": "user.username"
+        },
+        "inputBindings": {
+          "name": "inputs.username",
+          "email": "inputs.username + '@example.com'",
+          "password": "'generated_password_for_new_user'",
+          "username": "inputs.username"
+        }
       },
       {
         "key": "create_channel_if_missing",
         "description": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
         "kind": "runtime_tool",
+        "purpose": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
         "dependsOn": [
           "find_channel"
         ],
+        "condition": "channel_not_found",
         "endpointKey": "post-api-v1-channels.create",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "name",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id",
+          "channel_name": "channel.name"
+        },
+        "inputBindings": {
+          "name": "inputs.channel_name"
+        }
+      },
+      {
+        "key": "generate_welcome_message",
+        "description": "Generates the content of the welcome message using an LLM.",
+        "kind": "llm_step",
+        "purpose": "Generates the content of the welcome message using an LLM.",
+        "promptTemplate": "Generate a welcome message for user {{username}} joining channel {{channel_name}}. Keep it concise and friendly.",
+        "dependsOn": [
+          "find_user",
+          "find_channel",
+          "create_user_if_missing",
+          "create_channel_if_missing"
+        ],
+        "inputs": [
+          {
+            "name": "username",
+            "in": "virtual",
+            "required": true
+          },
+          {
+            "name": "channel_name",
+            "in": "virtual",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "message_text": "message"
+        },
+        "inputBindings": {
+          "username": "inputs.username",
+          "channel_name": "inputs.channel_name"
+        }
       },
       {
         "key": "add_user_to_channel",
         "description": "Adds the user (found or created) to the channel (found or created).",
         "kind": "runtime_tool",
+        "purpose": "Adds the user (found or created) to the channel (found or created).",
         "dependsOn": [
+          "find_user",
+          "find_channel",
           "create_user_if_missing",
           "create_channel_if_missing"
         ],
         "endpointKey": "post-api-v1-channels.invite",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "userId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "userIds",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id"
+        },
+        "inputBindings": {
+          "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+          "userId": "find_user.user_id ?? create_user_if_missing.user_id",
+          "userIds": "[find_user.user_id ?? create_user_if_missing.user_id]"
+        }
       },
       {
         "key": "send_welcome_message",
         "description": "Sends the generated welcome message to the specified channel.",
         "kind": "runtime_tool",
+        "purpose": "Sends the generated welcome message to the specified channel.",
         "dependsOn": [
           "generate_welcome_message",
           "add_user_to_channel"
         ],
         "endpointKey": "post-api-v1-chat.postMessage",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "text",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "channel",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "message_id": "message._id"
+        },
+        "inputBindings": {
+          "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+          "text": "generate_welcome_message.message_text",
+          "channel": "find_channel.channel_name ?? create_channel_if_missing.channel_name"
+        }
       }
     ]
   },
@@ -395,68 +739,240 @@
         }
       }
     },
+    "conditions": [
+      {
+        "key": "user_not_found",
+        "description": "True if the user was not found by the 'find_user' step.",
+        "promptTemplate": "Return TRUE if find_user.user_id is null or undefined, otherwise FALSE.",
+        "dependsOn": [
+          "find_user"
+        ]
+      },
+      {
+        "key": "channel_not_found",
+        "description": "True if the channel was not found by the 'find_channel' step.",
+        "promptTemplate": "Return TRUE if find_channel.channel_id is null or undefined, otherwise FALSE.",
+        "dependsOn": [
+          "find_channel"
+        ]
+      }
+    ],
     "steps": [
       {
         "key": "find_user",
         "description": "Finds an existing user by their username.",
         "kind": "runtime_tool",
+        "purpose": "Finds an existing user by their username.",
         "endpointKey": "get-api-v1-users.info",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "user_id": "user._id",
+          "username": "user.username"
+        },
+        "inputBindings": {
+          "userId": "inputs.username"
+        }
       },
       {
         "key": "find_channel",
         "description": "Finds an existing channel by its name.",
         "kind": "runtime_tool",
+        "purpose": "Finds an existing channel by its name.",
         "endpointKey": "get-api-v1-channels.info",
-        "inputs": []
-      },
-      {
-        "key": "generate_welcome_message",
-        "description": "Generates the content of the welcome message using an LLM.",
-        "kind": "runtime_tool",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomName",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id",
+          "channel_name": "channel.name"
+        },
+        "inputBindings": {
+          "roomName": "inputs.channel_name"
+        }
       },
       {
         "key": "create_user_if_missing",
         "description": "Creates a new user if the user was not found by the 'find_user' step.",
         "kind": "runtime_tool",
+        "purpose": "Creates a new user if the user was not found by the 'find_user' step.",
         "dependsOn": [
           "find_user"
         ],
+        "condition": "user_not_found",
         "endpointKey": "post-api-v1-users.create",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "name",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "email",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "password",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "username",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "user_id": "user._id",
+          "username": "user.username"
+        },
+        "inputBindings": {
+          "name": "inputs.username",
+          "email": "inputs.username + '@example.com'",
+          "password": "'generated_password_for_new_user'",
+          "username": "inputs.username"
+        }
       },
       {
         "key": "create_channel_if_missing",
         "description": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
         "kind": "runtime_tool",
+        "purpose": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
         "dependsOn": [
           "find_channel"
         ],
+        "condition": "channel_not_found",
         "endpointKey": "post-api-v1-channels.create",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "name",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id",
+          "channel_name": "channel.name"
+        },
+        "inputBindings": {
+          "name": "inputs.channel_name"
+        }
+      },
+      {
+        "key": "generate_welcome_message",
+        "description": "Generates the content of the welcome message using an LLM.",
+        "kind": "llm_step",
+        "purpose": "Generates the content of the welcome message using an LLM.",
+        "promptTemplate": "Generate a welcome message for user {{username}} joining channel {{channel_name}}. Keep it concise and friendly.",
+        "dependsOn": [
+          "find_user",
+          "find_channel",
+          "create_user_if_missing",
+          "create_channel_if_missing"
+        ],
+        "inputs": [
+          {
+            "name": "username",
+            "in": "virtual",
+            "required": true
+          },
+          {
+            "name": "channel_name",
+            "in": "virtual",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "message_text": "message"
+        },
+        "inputBindings": {
+          "username": "inputs.username",
+          "channel_name": "inputs.channel_name"
+        }
       },
       {
         "key": "add_user_to_channel",
         "description": "Adds the user (found or created) to the channel (found or created).",
         "kind": "runtime_tool",
+        "purpose": "Adds the user (found or created) to the channel (found or created).",
         "dependsOn": [
+          "find_user",
+          "find_channel",
           "create_user_if_missing",
           "create_channel_if_missing"
         ],
         "endpointKey": "post-api-v1-channels.invite",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "userId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "userIds",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "channel_id": "channel._id"
+        },
+        "inputBindings": {
+          "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+          "userId": "find_user.user_id ?? create_user_if_missing.user_id",
+          "userIds": "[find_user.user_id ?? create_user_if_missing.user_id]"
+        }
       },
       {
         "key": "send_welcome_message",
         "description": "Sends the generated welcome message to the specified channel.",
         "kind": "runtime_tool",
+        "purpose": "Sends the generated welcome message to the specified channel.",
         "dependsOn": [
           "generate_welcome_message",
           "add_user_to_channel"
         ],
         "endpointKey": "post-api-v1-chat.postMessage",
-        "inputs": []
+        "inputs": [
+          {
+            "name": "roomId",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "text",
+            "in": "body",
+            "required": true
+          },
+          {
+            "name": "channel",
+            "in": "body",
+            "required": true
+          }
+        ],
+        "outputs": {
+          "message_id": "message._id"
+        },
+        "inputBindings": {
+          "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+          "text": "generate_welcome_message.message_text",
+          "channel": "find_channel.channel_name ?? create_channel_if_missing.channel_name"
+        }
       }
     ]
   },
@@ -636,12 +1152,6 @@
       ]
     },
     {
-      "key": "generate_welcome_message",
-      "kind": "runtime_tool",
-      "endpointKey": "",
-      "candidateEndpoints": []
-    },
-    {
       "key": "create_user_if_missing",
       "kind": "runtime_tool",
       "endpointKey": "post-api-v1-users.create",
@@ -719,6 +1229,12 @@
       ]
     },
     {
+      "key": "generate_welcome_message",
+      "kind": "llm_step",
+      "endpointKey": "",
+      "candidateEndpoints": []
+    },
+    {
       "key": "add_user_to_channel",
       "kind": "runtime_tool",
       "endpointKey": "post-api-v1-channels.invite",
@@ -768,51 +1284,6 @@
             "channel.lastMessage.urls",
             "channel.lastMessage.mentions",
             "channel.lastMessage.channels",
-            "success"
-          ]
-        },
-        {
-          "key": "post-api-v1-channels.join",
-          "summary": "Join a Channel",
-          "produces": [
-            "channel",
-            "channel._id",
-            "channel.fname",
-            "channel.customFields",
-            "channel.topic",
-            "channel.broadcast",
-            "channel.encrypted",
-            "channel.name",
-            "channel.t",
-            "channel.msgs",
-            "channel.usersCount",
-            "channel.u",
-            "channel.u._id",
-            "channel.u.username",
-            "channel.ts",
-            "channel.ro",
-            "channel.default",
-            "channel.sysMes",
-            "channel._updatedAt",
-            "channel.lastMessage",
-            "channel.lastMessage._id",
-            "channel.lastMessage.rid",
-            "channel.lastMessage.msg",
-            "channel.lastMessage.ts",
-            "channel.lastMessage.u",
-            "channel.lastMessage.u._id",
-            "channel.lastMessage.u.username",
-            "channel.lastMessage.u.name",
-            "channel.lastMessage._updatedAt",
-            "channel.lastMessage.urls",
-            "channel.lastMessage.mentions",
-            "channel.lastMessage.channels",
-            "channel.lastMessage.md",
-            "channel.lastMessage.md[].type",
-            "channel.lastMessage.md[].value",
-            "channel.lastMessage.md[].value[].type",
-            "channel.lastMessage.md[].value[].value",
-            "channel.lm",
             "success"
           ]
         },
@@ -911,18 +1382,18 @@
     },
     {
       "id": 3,
-      "key": "generate_welcome_message",
-      "description": "Generates the content of the welcome message using an LLM.",
-      "kind": "runtime_tool",
-      "endpoint": "",
-      "params": {}
-    },
-    {
-      "id": 4,
       "key": "create_user_if_missing",
       "description": "Creates a new user if the user was not found by the 'find_user' step.",
       "kind": "runtime_tool",
       "endpoint": "post-api-v1-users.create",
+      "params": {}
+    },
+    {
+      "id": 4,
+      "key": "generate_welcome_message",
+      "description": "Generates the content of the welcome message using an LLM.",
+      "kind": "llm_step",
+      "endpoint": "",
       "params": {}
     },
     {
@@ -973,10 +1444,6 @@
         ]
       },
       {
-        "key": "generate_welcome_message",
-        "description": "Generates the content of the welcome message using an LLM."
-      },
-      {
         "key": "create_user_if_missing",
         "description": "Creates a new user if the user was not found by the 'find_user' step.",
         "operationId": "post-api-v1-users.create",
@@ -984,6 +1451,10 @@
           "post-api-v1-users.create",
           "post-api-v1-users.register"
         ]
+      },
+      {
+        "key": "generate_welcome_message",
+        "description": "Generates the content of the welcome message using an LLM."
       },
       {
         "key": "create_channel_if_missing",
@@ -999,7 +1470,6 @@
         "operationId": "post-api-v1-channels.invite",
         "candidateEndpoints": [
           "post-api-v1-channels.invite",
-          "post-api-v1-channels.join",
           "post-api-v1-channels.addAll"
         ]
       },
@@ -1038,127 +1508,337 @@
           }
         }
       },
+      "conditions": [
+        {
+          "key": "user_not_found",
+          "description": "True if the user was not found by the 'find_user' step.",
+          "promptTemplate": "Return TRUE if find_user.user_id is null or undefined, otherwise FALSE.",
+          "dependsOn": [
+            "find_user"
+          ]
+        },
+        {
+          "key": "channel_not_found",
+          "description": "True if the channel was not found by the 'find_channel' step.",
+          "promptTemplate": "Return TRUE if find_channel.channel_id is null or undefined, otherwise FALSE.",
+          "dependsOn": [
+            "find_channel"
+          ]
+        }
+      ],
       "steps": [
         {
           "key": "find_user",
           "description": "Finds an existing user by their username.",
           "kind": "runtime_tool",
+          "purpose": "Finds an existing user by their username.",
           "endpointKey": "get-api-v1-users.info",
-          "inputs": []
+          "inputs": [
+            {
+              "name": "userId",
+              "in": "query",
+              "required": true
+            }
+          ],
+          "outputs": {
+            "user_id": "user._id",
+            "username": "user.username"
+          },
+          "inputBindings": {
+            "userId": "inputs.username"
+          }
         },
         {
           "key": "find_channel",
           "description": "Finds an existing channel by its name.",
           "kind": "runtime_tool",
+          "purpose": "Finds an existing channel by its name.",
           "endpointKey": "get-api-v1-channels.info",
-          "inputs": []
-        },
-        {
-          "key": "generate_welcome_message",
-          "description": "Generates the content of the welcome message using an LLM.",
-          "kind": "runtime_tool",
-          "inputs": []
+          "inputs": [
+            {
+              "name": "roomName",
+              "in": "query",
+              "required": true
+            }
+          ],
+          "outputs": {
+            "channel_id": "channel._id",
+            "channel_name": "channel.name"
+          },
+          "inputBindings": {
+            "roomName": "inputs.channel_name"
+          }
         },
         {
           "key": "create_user_if_missing",
           "description": "Creates a new user if the user was not found by the 'find_user' step.",
           "kind": "runtime_tool",
+          "purpose": "Creates a new user if the user was not found by the 'find_user' step.",
           "dependsOn": [
             "find_user"
           ],
+          "condition": "user_not_found",
           "endpointKey": "post-api-v1-users.create",
-          "inputs": []
+          "inputs": [
+            {
+              "name": "name",
+              "in": "body",
+              "required": true
+            },
+            {
+              "name": "email",
+              "in": "body",
+              "required": true
+            },
+            {
+              "name": "password",
+              "in": "body",
+              "required": true
+            },
+            {
+              "name": "username",
+              "in": "body",
+              "required": true
+            }
+          ],
+          "outputs": {
+            "user_id": "user._id",
+            "username": "user.username"
+          },
+          "inputBindings": {
+            "name": "inputs.username",
+            "email": "inputs.username + '@example.com'",
+            "password": "'generated_password_for_new_user'",
+            "username": "inputs.username"
+          }
         },
         {
           "key": "create_channel_if_missing",
           "description": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
           "kind": "runtime_tool",
+          "purpose": "Creates a new channel of type 'channel' if the channel was not found by the 'find_channel' step.",
           "dependsOn": [
             "find_channel"
           ],
+          "condition": "channel_not_found",
           "endpointKey": "post-api-v1-channels.create",
-          "inputs": []
+          "inputs": [
+            {
+              "name": "name",
+              "in": "body",
+              "required": true
+            }
+          ],
+          "outputs": {
+            "channel_id": "channel._id",
+            "channel_name": "channel.name"
+          },
+          "inputBindings": {
+            "name": "inputs.channel_name"
+          }
+        },
+        {
+          "key": "generate_welcome_message",
+          "description": "Generates the content of the welcome message using an LLM.",
+          "kind": "llm_step",
+          "purpose": "Generates the content of the welcome message using an LLM.",
+          "promptTemplate": "Generate a welcome message for user {{username}} joining channel {{channel_name}}. Keep it concise and friendly.",
+          "dependsOn": [
+            "find_user",
+            "find_channel",
+            "create_user_if_missing",
+            "create_channel_if_missing"
+          ],
+          "inputs": [
+            {
+              "name": "username",
+              "in": "virtual",
+              "required": true
+            },
+            {
+              "name": "channel_name",
+              "in": "virtual",
+              "required": true
+            }
+          ],
+          "outputs": {
+            "message_text": "message"
+          },
+          "inputBindings": {
+            "username": "inputs.username",
+            "channel_name": "inputs.channel_name"
+          }
         },
         {
           "key": "add_user_to_channel",
           "description": "Adds the user (found or created) to the channel (found or created).",
           "kind": "runtime_tool",
+          "purpose": "Adds the user (found or created) to the channel (found or created).",
           "dependsOn": [
+            "find_user",
+            "find_channel",
             "create_user_if_missing",
             "create_channel_if_missing"
           ],
           "endpointKey": "post-api-v1-channels.invite",
-          "inputs": []
+          "inputs": [
+            {
+              "name": "roomId",
+              "in": "body",
+              "required": true
+            },
+            {
+              "name": "userId",
+              "in": "body",
+              "required": true
+            },
+            {
+              "name": "userIds",
+              "in": "body",
+              "required": true
+            }
+          ],
+          "outputs": {
+            "channel_id": "channel._id"
+          },
+          "inputBindings": {
+            "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+            "userId": "find_user.user_id ?? create_user_if_missing.user_id",
+            "userIds": "[find_user.user_id ?? create_user_if_missing.user_id]"
+          }
         },
         {
           "key": "send_welcome_message",
           "description": "Sends the generated welcome message to the specified channel.",
           "kind": "runtime_tool",
+          "purpose": "Sends the generated welcome message to the specified channel.",
           "dependsOn": [
             "generate_welcome_message",
             "add_user_to_channel"
           ],
           "endpointKey": "post-api-v1-chat.postMessage",
-          "inputs": []
+          "inputs": [
+            {
+              "name": "roomId",
+              "in": "body",
+              "required": true
+            },
+            {
+              "name": "text",
+              "in": "body",
+              "required": true
+            },
+            {
+              "name": "channel",
+              "in": "body",
+              "required": true
+            }
+          ],
+          "outputs": {
+            "message_id": "message._id"
+          },
+          "inputBindings": {
+            "roomId": "find_channel.channel_id ?? create_channel_if_missing.channel_id",
+            "text": "generate_welcome_message.message_text",
+            "channel": "find_channel.channel_name ?? create_channel_if_missing.channel_name"
+          }
         }
       ]
     }
   ],
   "refinement": {
-    "strategy": "fallback",
-    "notes": []
+    "strategy": "llm",
+    "notes": [
+      "A potential conflict exists for the 'find_user' step: The specified endpoint 'get-api-v1-users.info' officially requires 'userId' as a query parameter, but the workflow's input provides 'username'. For this exercise, 'inputs.username' has been pragmatically bound to 'userId' for 'find_user', assuming an implicit resolution or a downstream transformation. In a real scenario, this would require clarification or a workflow adjustment (e.g., adding a username-to-userId resolution step)."
+    ]
   },
   "validation": {
     "isValid": false,
     "errors": [
-      "Step 3 is missing an endpoint.",
-      "Step find_user must declare at least one output.",
-      "Step find_channel must declare at least one output.",
-      "Step generate_welcome_message must declare at least one output.",
-      "Step create_user_if_missing must declare at least one output.",
-      "Step create_channel_if_missing must declare at least one output.",
-      "Step add_user_to_channel must declare at least one output.",
-      "Step send_welcome_message must declare at least one output.",
-      "Step generate_welcome_message references unknown endpoint \"\"."
+      "Step create_user_if_missing binds input \"email\" to unresolved source \"inputs.username + '@example.com'\".",
+      "Step create_user_if_missing binds input \"password\" to unresolved source \"'generated_password_for_new_user'\".",
+      "Step add_user_to_channel binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+      "Step add_user_to_channel binds input \"userId\" to unresolved source \"find_user.user_id ?? create_user_if_missing.user_id\".",
+      "Step add_user_to_channel binds input \"userIds\" to unresolved source \"[find_user.user_id ?? create_user_if_missing.user_id]\".",
+      "Step send_welcome_message binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+      "Step send_welcome_message binds input \"text\" to unresolved source \"generate_welcome_message.message_text\".",
+      "Step send_welcome_message binds input \"channel\" to unresolved source \"find_channel.channel_name ?? create_channel_if_missing.channel_name\".",
+      "Step find_channel requires input \"roomName\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_user_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_user_if_missing requires input \"email\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_user_if_missing requires input \"password\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_channel_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step add_user_to_channel requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step add_user_to_channel requires input \"userIds\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step send_welcome_message requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step send_welcome_message requires input \"text\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step send_welcome_message requires input \"channel\" that cannot be satisfied from workflow inputs or previous step outputs."
     ],
     "preRepairErrors": [
-      "Step 3 is missing an endpoint.",
-      "Step find_user must declare at least one output.",
-      "Step find_channel must declare at least one output.",
-      "Step generate_welcome_message must declare at least one output.",
-      "Step create_user_if_missing must declare at least one output.",
-      "Step create_channel_if_missing must declare at least one output.",
-      "Step add_user_to_channel must declare at least one output.",
-      "Step send_welcome_message must declare at least one output.",
-      "Step generate_welcome_message references unknown endpoint \"\"."
+      "Step create_user_if_missing binds input \"email\" to unresolved source \"inputs.username + '@example.com'\".",
+      "Step create_user_if_missing binds input \"password\" to unresolved source \"'generated_password_for_new_user'\".",
+      "Step add_user_to_channel binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+      "Step add_user_to_channel binds input \"userId\" to unresolved source \"find_user.user_id ?? create_user_if_missing.user_id\".",
+      "Step add_user_to_channel binds input \"userIds\" to unresolved source \"[find_user.user_id ?? create_user_if_missing.user_id]\".",
+      "Step send_welcome_message binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+      "Step send_welcome_message binds input \"text\" to unresolved source \"generate_welcome_message.message_text\".",
+      "Step send_welcome_message binds input \"channel\" to unresolved source \"find_channel.channel_name ?? create_channel_if_missing.channel_name\".",
+      "Step find_channel requires input \"roomName\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_user_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_user_if_missing requires input \"email\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_user_if_missing requires input \"password\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step create_channel_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step add_user_to_channel requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step add_user_to_channel requires input \"userIds\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step send_welcome_message requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step send_welcome_message requires input \"text\" that cannot be satisfied from workflow inputs or previous step outputs.",
+      "Step send_welcome_message requires input \"channel\" that cannot be satisfied from workflow inputs or previous step outputs."
     ],
     "attemptedRepair": true
   },
   "validationErrors": [
-    "Step 3 is missing an endpoint.",
-    "Step find_user must declare at least one output.",
-    "Step find_channel must declare at least one output.",
-    "Step generate_welcome_message must declare at least one output.",
-    "Step create_user_if_missing must declare at least one output.",
-    "Step create_channel_if_missing must declare at least one output.",
-    "Step add_user_to_channel must declare at least one output.",
-    "Step send_welcome_message must declare at least one output.",
-    "Step generate_welcome_message references unknown endpoint \"\"."
+    "Step create_user_if_missing binds input \"email\" to unresolved source \"inputs.username + '@example.com'\".",
+    "Step create_user_if_missing binds input \"password\" to unresolved source \"'generated_password_for_new_user'\".",
+    "Step add_user_to_channel binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+    "Step add_user_to_channel binds input \"userId\" to unresolved source \"find_user.user_id ?? create_user_if_missing.user_id\".",
+    "Step add_user_to_channel binds input \"userIds\" to unresolved source \"[find_user.user_id ?? create_user_if_missing.user_id]\".",
+    "Step send_welcome_message binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+    "Step send_welcome_message binds input \"text\" to unresolved source \"generate_welcome_message.message_text\".",
+    "Step send_welcome_message binds input \"channel\" to unresolved source \"find_channel.channel_name ?? create_channel_if_missing.channel_name\".",
+    "Step find_channel requires input \"roomName\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_user_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_user_if_missing requires input \"email\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_user_if_missing requires input \"password\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_channel_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step add_user_to_channel requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step add_user_to_channel requires input \"userIds\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step send_welcome_message requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step send_welcome_message requires input \"text\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step send_welcome_message requires input \"channel\" that cannot be satisfied from workflow inputs or previous step outputs."
   ],
   "validationErrorsRaw": [
-    "Step 3 is missing an endpoint.",
-    "Step find_user must declare at least one output.",
-    "Step find_channel must declare at least one output.",
-    "Step generate_welcome_message must declare at least one output.",
-    "Step create_user_if_missing must declare at least one output.",
-    "Step create_channel_if_missing must declare at least one output.",
-    "Step add_user_to_channel must declare at least one output.",
-    "Step send_welcome_message must declare at least one output.",
-    "Step generate_welcome_message references unknown endpoint \"\"."
+    "Step create_user_if_missing binds input \"email\" to unresolved source \"inputs.username + '@example.com'\".",
+    "Step create_user_if_missing binds input \"password\" to unresolved source \"'generated_password_for_new_user'\".",
+    "Step add_user_to_channel binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+    "Step add_user_to_channel binds input \"userId\" to unresolved source \"find_user.user_id ?? create_user_if_missing.user_id\".",
+    "Step add_user_to_channel binds input \"userIds\" to unresolved source \"[find_user.user_id ?? create_user_if_missing.user_id]\".",
+    "Step send_welcome_message binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".",
+    "Step send_welcome_message binds input \"text\" to unresolved source \"generate_welcome_message.message_text\".",
+    "Step send_welcome_message binds input \"channel\" to unresolved source \"find_channel.channel_name ?? create_channel_if_missing.channel_name\".",
+    "Step find_channel requires input \"roomName\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_user_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_user_if_missing requires input \"email\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_user_if_missing requires input \"password\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step create_channel_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step add_user_to_channel requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step add_user_to_channel requires input \"userIds\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step send_welcome_message requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step send_welcome_message requires input \"text\" that cannot be satisfied from workflow inputs or previous step outputs.",
+    "Step send_welcome_message requires input \"channel\" that cannot be satisfied from workflow inputs or previous step outputs."
   ],
   "tokenUsage": {
     "input": 30,
-    "output": 5956
+    "output": 9970
   },
-  "debug": "Step 3 is missing an endpoint.\nStep find_user must declare at least one output.\nStep find_channel must declare at least one output.\nStep generate_welcome_message must declare at least one output.\nStep create_user_if_missing must declare at least one output.\nStep create_channel_if_missing must declare at least one output.\nStep add_user_to_channel must declare at least one output.\nStep send_welcome_message must declare at least one output.\nStep generate_welcome_message references unknown endpoint \"\"."
+  "debug": "Step create_user_if_missing binds input \"email\" to unresolved source \"inputs.username + '@example.com'\".\nStep create_user_if_missing binds input \"password\" to unresolved source \"'generated_password_for_new_user'\".\nStep add_user_to_channel binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".\nStep add_user_to_channel binds input \"userId\" to unresolved source \"find_user.user_id ?? create_user_if_missing.user_id\".\nStep add_user_to_channel binds input \"userIds\" to unresolved source \"[find_user.user_id ?? create_user_if_missing.user_id]\".\nStep send_welcome_message binds input \"roomId\" to unresolved source \"find_channel.channel_id ?? create_channel_if_missing.channel_id\".\nStep send_welcome_message binds input \"text\" to unresolved source \"generate_welcome_message.message_text\".\nStep send_welcome_message binds input \"channel\" to unresolved source \"find_channel.channel_name ?? create_channel_if_missing.channel_name\".\nStep find_channel requires input \"roomName\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep create_user_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep create_user_if_missing requires input \"email\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep create_user_if_missing requires input \"password\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep create_channel_if_missing requires input \"name\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep add_user_to_channel requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep add_user_to_channel requires input \"userIds\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep send_welcome_message requires input \"roomId\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep send_welcome_message requires input \"text\" that cannot be satisfied from workflow inputs or previous step outputs.\nStep send_welcome_message requires input \"channel\" that cannot be satisfied from workflow inputs or previous step outputs."
 }

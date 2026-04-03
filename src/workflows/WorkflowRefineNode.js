@@ -23,7 +23,7 @@ const validateIoRefinement = compileSchema({
           promptTemplate: { type: "string" },
           inputs: { type: "array", items: { type: "object", additionalProperties: true } },
           outputs: { type: "object", additionalProperties: { type: "string" } },
-          inputBindings: { type: "object", additionalProperties: { type: "string" } },
+          inputBindings: { type: "object", additionalProperties: { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] } },
         },
         required: ["key"],
         additionalProperties: true,
@@ -130,6 +130,7 @@ Rules:
 * Return one entry for EVERY workflow step
 * Always include step key
 * Treat kind, endpointKey, dependsOn, conditions as fixed
+* Reason globally across the WHOLE workflow, not one step in isolation
 
 ---
 
@@ -139,6 +140,14 @@ runtime_tool:
 * inputs must be present and must include all required non-header inputs
 * outputs must be present and non-empty; outputs = alias → valid endpoint result path
 * inputBindings must be present and must bind every required input
+* Prefer canonical aliases for reusable business values:
+  * user_id
+  * username
+  * channel_id
+  * channel_name
+  * room_id
+  * message_text
+* If multiple steps can produce the same logical value, expose the SAME alias from each of them
 
 llm_step / compute_step:
 
@@ -146,6 +155,8 @@ llm_step / compute_step:
 * inputs must be present and use "virtual" where appropriate
 * outputs must be present and non-empty
 * inputBindings must be present and must bind all inputs
+* Use compute_step for deterministic value selection/derivation such as resolving ids across branches
+* Use llm_step only for actual content generation/synthesis
 
 ---
 
@@ -155,7 +166,29 @@ Data Flow:
 
   * inputs.<name> OR
   * steps.<step>.result.<path>
+* inputBindings values must use ONLY one of these exact reference forms:
+  * inputs.<name>
+  * steps.<step_key>.result.<path>
+* Do NOT use JavaScript or pseudo-code in inputBindings
+* Do NOT use expressions such as:
+  * inputs.username + '@example.com'
+  * find_channel.channel_id ?? create_channel_if_missing.channel_id
+  * [find_user.user_id ?? create_user_if_missing.user_id]
+  * generate_welcome_message.message_text
+* Do NOT use shorthand like step.alias or bare alias names; always use full workflow references
+* If a value must be derived, formatted, combined, defaulted, or selected from multiple branches, create/use a compute_step and bind to that step's outputs using steps.<step>.result.<path>
+* If a constant string/value is needed, do NOT place it in inputBindings; instead expose it via workflow inputs or a compute_step output
 * Ensure values needed later (ids, text, etc.) are produced earlier
+* Think required-input-by-required-input for each chosen endpoint
+* If a downstream value may come from lookup OR create branches, do NOT bind only to one conditional producer
+* If two branches may produce the same logical value:
+  * either expose the same alias from both branches, OR
+  * add/complete a compute_step resolver that selects the common value for later steps
+* Downstream steps should prefer shared aliases over endpoint-specific raw payload paths
+* If a conditional step is the only producer of a value, any consumer of that value must either:
+  * be under the same condition, OR
+  * get the value from an additional non-conditional/fallback producer
+* Never use literals or templates as inputBindings sources unless they are valid workflow inputs or prior step outputs
 
 ---
 
@@ -165,6 +198,9 @@ Constraints:
 * Do not leave unresolved inputs
 * Do not leave any step with empty inputs, empty outputs, or missing bindings for required inputs
 * Prefer minimal but complete bindings
+* Prefer workflow-wide consistency over local per-step convenience
+* When a lookup step and a create-if-missing step produce the same entity, normalize them to common aliases for downstream use
+* Output valid JSON only; never wrap fields in markdown code fences and never emit tokens like javascript
 
 ---
 
@@ -335,8 +371,8 @@ function assertRefinedWorkflowComplete(workflow) {
 async function runIoPass(query, workflow, endpointCatalog) {
   const raw = await runGeminiPrompt(
     buildIoPrompt(query, workflow, endpointCatalog),
-    25000,
-    2 * 1024 * 1024,
+    60000,
+    4 * 1024 * 1024,
   );
   if (!raw || !raw.trim()) {
     throw new Error("Gemini returned empty output for workflow I/O refinement.");
@@ -355,8 +391,8 @@ async function runConditionsPass(query, workflow) {
 
   const raw = await runGeminiPrompt(
     buildConditionsPrompt(query, workflow),
-    25000,
-    2 * 1024 * 1024,
+    60000,
+    4 * 1024 * 1024,
   );
   if (!raw || !raw.trim()) {
     throw new Error("Gemini returned empty output for workflow condition refinement.");

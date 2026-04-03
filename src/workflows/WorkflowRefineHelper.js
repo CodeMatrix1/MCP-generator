@@ -1,3 +1,5 @@
+import { normalizeInputBindings, normalizeOutputs } from "./WorkflowNodeHelpers.js";
+
 function normalizeRefinedStep(step, fallbackStep, index) {
   const allowedKinds = new Set([
     "runtime_tool",

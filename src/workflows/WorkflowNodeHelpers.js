@@ -129,7 +129,7 @@ function normalizeDependsOn(dependsOn) {
     : (dependsOn ? [dependsOn].filter(Boolean) : []);
 }
 
-function normalizeOutputs(outputs) {
+export function normalizeOutputs(outputs) {
   if (outputs && typeof outputs === "object" && !Array.isArray(outputs)) {
     const normalized = Object.fromEntries(
       Object.entries(outputs)
@@ -144,7 +144,7 @@ function normalizeOutputs(outputs) {
     : undefined;
 }
 
-function normalizeInputBindings(inputBindings) {
+export function normalizeInputBindings(inputBindings) {
   if (!inputBindings || typeof inputBindings !== "object" || Array.isArray(inputBindings)) {
     return undefined;
   }

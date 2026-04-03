@@ -39,6 +39,7 @@ const validateWorkflowDraft = compileSchema({
               properties: {
                 key: { type: "string" },
                 description: { type: "string" },
+                kind: { type: "string" },
                 dependsOn: {
                   type: "array",
                   items: { type: "string" },
@@ -130,6 +131,7 @@ Return strict JSON only with this shape(no extra text):
       "steps": [
         {
           "key": "snake_case_step",
+          "kind": "runtime_tool",
           "description": "what this step does",
           "dependsOn": ["earlier_step_key"]
         }
@@ -146,6 +148,16 @@ Return strict JSON only with this shape(no extra text):
 * Avoid generic names like: prepare, process, handle
 * Use clear verbs: find, create, add, update, generate, send, archive, pin
 * Do NOT include API names, paths, or tool references
+* Every step MUST include a kind
+* Allowed kinds at draft time:
+  * runtime_tool = a Rocket.Chat/API-backed action
+  * llm_step = text/content generation or synthesis done by the LLM
+  * compute_step = deterministic transformation, derivation, fallback selection, or data shaping with no Rocket.Chat call
+* If a step generates, drafts, composes, or writes message content, it MUST be llm_step
+* If a step derives, combines, formats, selects, or transforms values without calling Rocket.Chat, it MUST be compute_step
+* Do NOT label a content-generation step as runtime_tool just because it is later used by a runtime step
+* Do NOT label a deterministic data-shaping step as runtime_tool just because a later runtime step consumes it
+* Example: "generate_welcome_message" must be "llm_step", "resolve_channel_id" can be "compute_step", and "send_welcome_message" is "runtime_tool"
 
 ---
 
@@ -199,6 +211,7 @@ function normalizeWorkflowDrafts(candidate, query = "") {
         ? workflow.steps
             .map((step, stepIndex) => ({
               key: sanitizeToken(step?.key, `step_${stepIndex + 1}`),
+              kind: String(step?.kind || "").trim(),
               description: String(step?.description || "").trim(),
               ...(normalizeDependsOn(step?.dependsOn).length > 0
                 ? { dependsOn: normalizeDependsOn(step.dependsOn) }

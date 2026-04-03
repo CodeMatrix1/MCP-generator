@@ -1,0 +1,197 @@
+{
+  "steps": [
+    {
+      "key": "find_user",
+      "inputs": [
+        {
+          "name": "X-Auth-Token",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "X-User-Id",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "userId",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "outputs": {
+        "id": "user._id",
+        "username": "user.username"
+      },
+      "inputBindings": {
+        "userId": "workflow.username"
+      }
+    },
+    {
+      "key": "find_channel",
+      "inputs": [
+        {
+          "name": "X-Auth-Token",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "X-User-Id",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "roomName",
+          "in": "query",
+          "required": false
+        }
+      ],
+      "outputs": {
+        "id": "channel._id",
+        "name": "channel.name"
+      },
+      "inputBindings": {
+        "roomName": "workflow.channel_name"
+      }
+    },
+    {
+      "key": "create_user_if_missing",
+      "inputs": [
+        {
+          "name": "X-User-Id",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "X-Auth-Token",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "required": true
+        },
+        {
+          "name": "email",
+          "in": "body",
+          "required": true
+        },
+        {
+          "name": "password",
+          "in": "body",
+          "required": true
+        },
+        {
+          "name": "username",
+          "in": "body",
+          "required": true
+        }
+      ],
+      "outputs": {
+        "id": "user._id",
+        "username": "user.username"
+      },
+      "inputBindings": {
+        "name": "workflow.username",
+        "email": "workflow.username + '@example.com'",
+        "password": "'password'",
+        "username": "workflow.username"
+      }
+    },
+    {
+      "key": "create_channel_if_missing",
+      "inputs": [
+        {
+          "name": "X-Auth-Token",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "X-User-Id",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "required": true
+        }
+      ],
+      "outputs": {
+        "id": "channel._id",
+        "name": "channel.name"
+      },
+      "inputBindings": {
+        "name": "workflow.channel_name"
+      }
+    },
+    {
+      "key": "add_user_to_channel",
+      "inputs": [
+        {
+          "name": "X-Auth-Token",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "X-User-Id",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "roomId",
+          "in": "body",
+          "required": true
+        },
+        {
+          "name": "userId",
+          "in": "body",
+          "required": true
+        }
+      ],
+      "outputs": {
+        "channelId": "channel._id"
+      },
+      "inputBindings": {
+        "roomId": "steps.find_channel.id ?? steps.create_channel_if_missing.id",
+        "userId": "steps.find_user.id ?? steps.create_user_if_missing.id"
+      }
+    },
+    {
+      "key": "send_welcome_message",
+      "inputs": [
+        {
+          "name": "X-Auth-Token",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "X-User-Id",
+          "in": "header",
+          "required": true
+        },
+        {
+          "name": "roomId",
+          "in": "body",
+          "required": true
+        },
+        {
+          "name": "text",
+          "in": "body",
+          "required": false
+        }
+      ],
+      "outputs": {
+        "messageId": "message._id"
+      },
+      "inputBindings": {
+        "roomId": "steps.add_user_to_channel.channelId",
+        "text": "'Welcome to the channel!'"
+      }
+    }
+  ],
+  "notes": [
+    "The step 'generate_welcome_message' was omitted because it is defined as a 'runtime_tool' but lacks an 'endpointKey' and 'candidateEndpoints'. According to project guidelines, this constitutes a malformed step that cannot be properly refined at this stage."
+  ]
+}
